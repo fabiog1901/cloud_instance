@@ -1044,9 +1044,13 @@ def main():
     deployment = json.loads(sys.argv[3])
     defaults = json.loads(sys.argv[4])
 
-    return CloudInstance(
-        deployment_id,
-        present,
-        deployment,
-        defaults,
-    ).run()
+    print(
+        json.dumps(
+            CloudInstance(
+                deployment_id,
+                present,
+                deployment,
+                defaults,
+            ).run()
+        )
+    )
