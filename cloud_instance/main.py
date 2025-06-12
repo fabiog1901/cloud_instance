@@ -23,11 +23,10 @@ from google.api_core.extended_operation import ExtendedOperation
 
 # setup global logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 # create console handler and set level to debug
 ch = logging.FileHandler(filename="/tmp/cloud_instance.log")
-ch.setLevel(logging.DEBUG)
+ch.setLevel(logging.INFO)
 
 # create formatter
 formatter = logging.Formatter(
@@ -49,12 +48,16 @@ class CloudInstance:
         deployment: list,
         defaults: dict,
         preserve_existing_vms: bool = False,
+        return_tobedeleted_vms: bool = False,
+        gather_current_deployment_only: bool = False,
     ):
         self.deployment_id = deployment_id
         self.present = present
         self.deployment = deployment
         self.defaults = defaults
         self.preserve_existing_vms = preserve_existing_vms
+        self.return_tobedeleted_vms = return_tobedeleted_vms
+        self.gather_current_deployment_only = gather_current_deployment_only
 
         self.threads: list[threading.Thread] = []
         self._lock = threading.Lock()
@@ -68,62 +71,6 @@ class CloudInstance:
         self.new_instances = []
         self.instances = []
         self.errors: list = []
-
-    def run(self) -> list[dict]:
-        # fetch all running instances for the deployment_id and append them to the 'instances' list
-        logger.info(
-            f"Fetching all instances with deployment_id = '{self.deployment_id}'"
-        )
-        self.fetch_all(self.deployment_id, self.gcp_project, self.azure_resource_group)
-
-        if self.instances:
-            logger.debug("Listing pre-existing instances:")
-            for x in self.instances:
-                logger.debug(f"\t{x}")
-
-        # 3. build the deployment: a list of dict with these attributes:
-        #    - public_ip
-        #    - public_hostname
-        #    - private_ip
-        #    - private_hostname
-        #    - cloud
-        #    - region
-        #    - zone
-        #    - deployment_id
-        #    - cluster_name
-        #    - group_name
-        #    - inventory_groups
-        #    - ansible_user
-        #    - extra_vars
-        #    - the unique cloud identifier (eg aws instance_id, for easy deleting operations)
-
-        # instances of the new deployment will go into the 'new_instances' list
-        if self.present:
-            logger.info("Building deployment...")
-            self.build_deployment()
-
-        if self.instances and not self.preserve_existing_vms:
-            logger.info("Removing instances...")
-            self.destroy_all(self.instances)
-            logger.info("Removed all instances marked for deletion")
-
-        logger.info("Waiting for all operation threads to complete")
-        for x in self.threads:
-            x.join()
-        logger.info("All operation threads have completed")
-
-        if self.errors:
-            raise ValueError(self.errors)
-
-        logger.info("Listing new and current instances:")
-        for x in self.new_instances:
-            logger.info(f"\t{x}")
-
-        for x in self.instances:
-            logger.info(f"\tPRESERVED: {x}")
-
-        logger.debug("Returning new deployment list to client")
-        return self.new_instances + self.instances
 
     def fetch_all(
         self, deployment_id: str, gcp_project: str, azure_resource_group: str
@@ -164,6 +111,11 @@ class CloudInstance:
         # wait for all threads to complete
         for x in self.threads:
             x.join()
+        
+        self.threads = []
+            
+        # sort self.instances to ensure list is deterministic
+        self.instances = sorted(self.instances, key=lambda d: d['id'])
 
     def parse_aws_query(self, response):
         instances: list = []
@@ -489,7 +441,7 @@ class CloudInstance:
                 thread = threading.Thread(
                     target=target[group["cloud"]], args=(cluster_name, group, x)
                 )
-                thread.start()
+                #thread.start()
                 self.threads.append(thread)
 
         # CASE 3: REMOVE instances
@@ -544,7 +496,7 @@ class CloudInstance:
             # hardcoded value for root
             bdm[0]["DeviceName"] = "/dev/sda1"
 
-            logger.debug(f"Volumes: {bdm}")
+            # logger.debug(f"Volumes: {bdm}")
 
             # tags
             tags = [{"Key": k, "Value": v} for k, v in group["tags"].items()]
@@ -574,7 +526,7 @@ class CloudInstance:
                 Name=f"/aws/service{group['image']}/stable/current/{arch}/hvm/ebs-gp3/ami-id"
             )["Parameter"]["Value"]
 
-            logger.debug(f"Arch: {arch}, AMI: {image_id}")
+            # logger.debug(f"Arch: {arch}, AMI: {image_id}")
 
             ec2 = boto3.client("ec2", region_name=group["region"])
 
@@ -1075,6 +1027,66 @@ class CloudInstance:
 
         return result
 
+    def run(self) -> list[dict]:
+        
+        # fetch all running instances for the deployment_id and append them to the 'instances' list
+        logger.info(
+            f"Fetching all instances with deployment_id = '{self.deployment_id}'"
+        )
+        self.fetch_all(self.deployment_id, self.gcp_project, self.azure_resource_group)
+
+        if self.instances:
+            logger.info("Listing pre-existing instances:")
+            for x in self.instances:
+                logger.info(f"\t{x}")
+        else:
+            logger.info("No pre-existing instances")
+                
+        if self.gather_current_deployment_only:
+            return self.instances
+
+        # instances of the new deployment will go into the 'new_instances' list
+        if self.present:
+            logger.info("Building deployment...")
+            self.build_deployment()
+
+        # at this point, `instances` only has surplus vms that will be deleted
+        if self.instances:
+            logger.info("Listing instances slated for deletion")
+            for x in self.instances:
+                logger.info(f"\t{x}")
+                
+        if self.return_tobedeleted_vms:
+            return self.instances
+
+        logger.info("Creating new VMs...")
+        for x in self.threads:
+            x.start()
+            
+        if self.instances and not self.preserve_existing_vms:
+            logger.info("Removing instances...")
+            self.destroy_all(self.instances)
+            logger.info("Removed all instances marked for deletion")
+
+        logger.info("Waiting for all operation threads to complete")
+        for x in self.threads:
+            x.join()
+        logger.info("All operation threads have completed")
+
+        if self.errors:
+            raise ValueError(self.errors)
+
+        logger.info("Listing new instances:")
+        for x in self.new_instances:
+            logger.info(f"\t{x}")
+
+        logger.info("Listing preserved instances:")
+        for x in self.instances:
+            logger.info(f"\t{x}")
+
+        logger.debug("Returning new deployment list to client")
+        return self.new_instances + self.instances
+
 
 def str_to_bool(value: str) -> bool:
     return value.lower() in ["yes", "y", "true", "present", "1"]
@@ -1100,6 +1112,20 @@ def main():
         type=str_to_bool,
         help="Whether to preserve existing VMs (yes/no/true/false)",
     )
+    parser.add_argument(
+        "--return_tobedeleted_vms",
+        required=False,
+        default="no",
+        type=str_to_bool,
+        help="Return list of VMs slated to be deleted (yes/no/true/false)",
+    )
+    parser.add_argument(
+        "--gather_current_deployment_only",
+        required=False,
+        default="no",
+        type=str_to_bool,
+        help="Only gather the current list of VMs without creating or deleting (yes/no/true/false)",
+    )
 
     args = parser.parse_args()
 
@@ -1109,6 +1135,8 @@ def main():
         args.deployment,
         args.defaults,
         args.preserve,
+        args.return_tobedeleted_vms,
+        args.gather_current_deployment_only,
     ).run()
 
     print(json.dumps(result))
