@@ -23,6 +23,7 @@ from google.api_core.extended_operation import ExtendedOperation
 
 # setup global logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 # create console handler and set level to debug
 ch = logging.FileHandler(filename="/tmp/cloud_instance.log")
@@ -1051,22 +1052,31 @@ class CloudInstance:
             self.build_deployment()
 
         # at this point, `instances` only has surplus vms that will be deleted
-        if self.instances:
+           
+                
+        if self.return_tobedeleted_vms:
             logger.info("Listing instances slated for deletion")
             for x in self.instances:
                 logger.info(f"\t{x}")
                 
-        if self.return_tobedeleted_vms:
+            logger.info("Returning list of instances slated to be deleted to client")
             return self.instances
 
-        logger.info("Creating new VMs...")
-        for x in self.threads:
-            x.start()
-            
+        if self.threads:
+            logger.info("Creating new VMs...")
+            for x in self.threads:
+                x.start()
+        else:
+            logger.info("No instances to create")
+                
         if self.instances and not self.preserve_existing_vms:
+            logger.info("Listing instances slated for deletion")
+            for x in self.instances:
+                logger.info(f"\t{x}")
+                
             logger.info("Removing instances...")
             self.destroy_all(self.instances)
-            logger.info("Removed all instances marked for deletion")
+            self.instances = []
 
         logger.info("Waiting for all operation threads to complete")
         for x in self.threads:
@@ -1076,15 +1086,17 @@ class CloudInstance:
         if self.errors:
             raise ValueError(self.errors)
 
-        logger.info("Listing new instances:")
-        for x in self.new_instances:
-            logger.info(f"\t{x}")
+        if self.new_instances:
+            logger.info("Listing new instances:")
+            for x in self.new_instances:
+                logger.info(f"\t{x}")
 
-        logger.info("Listing preserved instances:")
-        for x in self.instances:
-            logger.info(f"\t{x}")
+        if self.instances:
+            logger.info("Listing preserved instances:")
+            for x in self.instances:
+                logger.info(f"\t{x}")
 
-        logger.debug("Returning new deployment list to client")
+        logger.info("Returning new deployment list to client")
         return self.new_instances + self.instances
 
 
