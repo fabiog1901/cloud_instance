@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cloud-instance"
-version = "0.1.1"
+version = "0.1.2"
 description = ""
 authors = ["Fabio Ghirardello"]
 license = "GPLv3+"
@@ -14,7 +14,7 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-cloud_instance = 'cloud_instance.main:main'
+cloud_instance = 'cloud_instance.cli.main:app'
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -32,6 +32,7 @@ azure-mgmt-compute = "^34.1.0"
 azure-mgmt-core = "^1.5.0"
 azure-mgmt-network = "^28.1.0"
 azure-mgmt-resource = "^23.3.0"
+typer = "^0.16.0"
 
 
 [build-system]

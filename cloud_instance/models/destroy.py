@@ -1,0 +1,134 @@
+import logging
+from threading import Thread, Lock
+
+# AWS
+import boto3
+
+# GCP
+from google.cloud.compute_v1 import InstancesClient
+
+# AZURE
+from azure.identity import EnvironmentCredential
+from azure.mgmt.compute import ComputeManagementClient
+
+logger = logging.getLogger("cloud_instance")
+
+errors: list[str] = []
+
+
+def destroy_all(
+    instances: list, gcp_project: str, azure_subscription_id, azure_resource_group
+):
+    threads: list[Thread] = []
+
+    for x in instances:
+        if x["cloud"] == "aws":
+            thread = Thread(target=destroy_aws_vm, args=(x,))
+        elif x["cloud"] == "gcp":
+            thread = Thread(target=destroy_gcp_vm, args=(x, gcp_project))
+        elif x["cloud"] == "azure":
+            thread = Thread(
+                target=destroy_azure_vm,
+                args=(x, azure_subscription_id, azure_resource_group),
+            )
+        else:
+            update_errors(f"cloud not supported: {x['cloud']}")
+
+        thread.start()
+        threads.append(thread)
+
+    for x in threads:
+        x.join()
+
+    global errors
+    return errors
+
+
+def update_errors(error: str):
+    global errors
+    with Lock():
+        errors.append(error)
+
+
+def destroy_aws_vm(instance: dict):
+
+    def get_allocation_id(public_ip, instance_id):
+        response = ec2.describe_addresses(PublicIps=[public_ip])
+
+        for address in response["Addresses"]:
+            # Check if the EIP is associated with the given instance ID
+            if address.get("InstanceId") == instance_id:
+                public_ip = address.get("PublicIp")
+                allocation_id = address.get("AllocationId")
+                print(
+                    f"Instance {instance_id} has EIP {public_ip} with Allocation ID {allocation_id}"
+                )
+                return allocation_id
+
+        update_errors(f"No Elastic IP found associated with instance {instance_id}")
+
+    logger.debug(f"--aws {instance['id']}")
+
+    try:
+        ec2 = boto3.client("ec2", region_name=instance["region"])
+
+        alloc = get_allocation_id(instance["public_ip"], instance["id"])
+
+        response = ec2.terminate_instances(
+            InstanceIds=[instance["id"]],
+        )
+
+        waiter = ec2.get_waiter("instance_terminated")
+        waiter.wait(InstanceIds=[instance["id"]])
+
+        status = response["TerminatingInstances"][0]["CurrentState"]["Name"]
+
+        if status in ["shutting-down", "terminated"]:
+            logger.debug(f"Deleted AWS instance: {instance}")
+        else:
+            logger.error(f"Unexpected response: {response}")
+            update_errors(str(response))
+
+        ec2.release_address(AllocationId=alloc)
+
+    except Exception as e:
+        logger.error(e)
+        update_errors(e)
+
+
+def destroy_gcp_vm(instance: dict, gcp_project):
+    logger.debug(f"--gcp {instance['id']}")
+
+    try:
+        instance_client = InstancesClient()
+
+        operation = instance_client.delete(
+            project=gcp_project,
+            zone="-".join([instance["region"], instance["zone"]]),
+            instance=instance["id"],
+        )
+        # self.__wait_for_extended_operation(operation)
+        logger.debug(f"Deleting GCP instance: {instance}")
+
+    except Exception as e:
+        logger.error(e)
+        update_errors(e)
+
+
+def destroy_azure_vm(instance: dict, azure_subscription_id, azure_resource_group):
+    logger.debug(f"--azure {instance['id']}")
+
+    # Acquire a credential object using CLI-based authentication.
+    try:
+        credential = EnvironmentCredential()
+
+        client = ComputeManagementClient(credential, azure_subscription_id)
+
+        async_vm_delete = client.virtual_machines.begin_delete(
+            azure_resource_group, instance["id"]
+        )
+        async_vm_delete.wait()
+
+    except Exception as e:
+        logger.error(e)
+        update_errors(e)

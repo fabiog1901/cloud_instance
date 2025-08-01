@@ -559,7 +559,11 @@ class CloudInstance:
             # wait until instance is running
             waiter = ec2.get_waiter("instance_running")
             waiter.wait(InstanceIds=[response["Instances"][0]["InstanceId"]])
-
+            
+            allocation = ec2.allocate_address(Domain='vpc')
+            resp = ec2.associate_address(AllocationId=allocation['AllocationId'],
+                                                InstanceId=response["Instances"][0]["InstanceId"])
+            
             # fetch details about the newly created instance
             response = ec2.describe_instances(
                 InstanceIds=[response["Instances"][0]["InstanceId"]]
@@ -899,15 +903,34 @@ class CloudInstance:
             self.threads.append(thread)
 
     def destroy_aws_vm(self, instance: dict):
+        
+        def get_allocation_id(public_ip, instance_id):
+            response = ec2.describe_addresses(PublicIps=[public_ip])
+
+            for address in response['Addresses']:
+                # Check if the EIP is associated with the given instance ID
+                if address.get('InstanceId') == instance_id:
+                    public_ip = address.get('PublicIp')
+                    allocation_id = address.get('AllocationId')
+                    print(f"Instance {instance_id} has EIP {public_ip} with Allocation ID {allocation_id}")
+                    return allocation_id
+
+            raise ValueError(f"No Elastic IP found associated with instance {instance_id}")
+            
         logger.debug(f"--aws {instance['id']}")
 
         try:
             ec2 = boto3.client("ec2", region_name=instance["region"])
 
+            alloc = get_allocation_id(instance["public_ip"], instance["id"])
+            
             response = ec2.terminate_instances(
                 InstanceIds=[instance["id"]],
             )
 
+            waiter = ec2.get_waiter("instance_terminated")
+            waiter.wait(InstanceIds=[instance["id"]])
+    
             status = response["TerminatingInstances"][0]["CurrentState"]["Name"]
 
             if status in ["shutting-down", "terminated"]:
@@ -916,6 +939,8 @@ class CloudInstance:
                 logger.error(f"Unexpected response: {response}")
                 self.log_error(response)
 
+            ec2.release_address(AllocationId=alloc)
+            
         except Exception as e:
             logger.error(e)
             self.log_error(e)
@@ -1035,13 +1060,19 @@ class CloudInstance:
         )
         self.fetch_all(self.deployment_id, self.gcp_project, self.azure_resource_group)
 
+        if self.errors:
+            raise ValueError(self.errors)
+        
         if self.instances:
             logger.info("Listing pre-existing instances:")
             for x in self.instances:
                 logger.info(f"\t{x}")
         else:
             logger.info("No pre-existing instances")
-                
+            
+        if self.errors:
+            raise ValueError(self.errors)
+            
         if self.gather_current_deployment_only:
             return self.instances
 
@@ -1137,8 +1168,55 @@ def main():
         type=str_to_bool,
         help="Only gather the current list of VMs without creating or deleting (yes/no/true/false)",
     )
+    
+    parser.add_argument(
+        "--mod",
+        required=False,
+        default="no",
+        type=str,
+        help="The instance ID",
+    )
+    parser.add_argument(
+        "--mod_cpu",
+        required=False,
+        default="no",
+        type=str,
+        help="The new cpu count",
+    )
+    parser.add_argument(
+        "--mod_region",
+        required=False,
+        default="no",
+        type=str,
+        help="The id region",
+    )
 
     args = parser.parse_args()
+    
+    
+    if args.mod:
+        ec2 = boto3.client("ec2", region_name=args.mod_region)
+        
+        print(f"Stopping instance {args.mod}...")
+        ec2.stop_instances(InstanceIds=[args.mod])
+        waiter = ec2.get_waiter("instance_stopped")
+        waiter.wait(InstanceIds=[args.mod])
+        print("Instance stopped.")
+
+        
+        print(f"Modifying instance {args.mod} to type {new_type}...")
+        ec2.modify_instance_attribute(
+            InstanceId=args.mod, InstanceType={"Value": new_type}
+        )
+        print("Instance type modified.")
+
+        print(f"Starting instance {args.mod}...")
+        ec2.start_instances(InstanceIds=[args.mod])
+        waiter = ec2.get_waiter("instance_running")
+        waiter.wait(InstanceIds=[args.mod])
+        print("Instance is running.")
+
+        return
 
     result = CloudInstance(
         args.deployment_id,
