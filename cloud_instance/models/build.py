@@ -119,7 +119,7 @@ def build_group(
 
     return current_vms, surplus_vms, new_vms
 
-def merge_dicts(self, parent: dict, child: dict):
+def merge_dicts(parent: dict, child: dict):
     merged = {}
 
     # add all kv pairs of 'import'

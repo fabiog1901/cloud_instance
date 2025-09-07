@@ -3,15 +3,18 @@
 Usage:
 
 ```text
-cloud_instance <deployment_id> <present/absent> <deployment> <defaults>
+cloud_instance create \
+  -d <deployment_id> 
+  --deployment <deployment> \
+  --defaults <defaults>
 ```
 
 Example:
 
 ```bash
-$ cloud_instance \
-    fabio1 \
-    present \
+cloud_instance create \
+    -d fabio1 \
+    --deployment \
     '[
         {
             "cluster_name": "fabio1",
@@ -29,7 +32,7 @@ $ cloud_instance \
                     "public_key_id": "workshop",
                     "tags": {"owner": "fabio"},
                     "cloud": "gcp",
-                    "image": "projects/ubuntu-os-cloud/global/images/family/ubuntu-2004-lts",
+                    "image": "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
                     "region": "us-east4",
                     "vpc_id": "default",
                     "security_groups": ["cockroachdb"],
@@ -39,8 +42,7 @@ $ cloud_instance \
             ]
         }
     ]' \
-    '{
-        "instances": {
+    --defaults '{
             "aws": {
                 "4": {
                     "default": "m6i.xlarge",
@@ -77,8 +79,7 @@ $ cloud_instance \
                     "64": "n2-highmem-8"
                 }
             }
-        }
-    }' | jq
+        }' | jq
 ```
 
 Output, formatted thanks to `jq`:

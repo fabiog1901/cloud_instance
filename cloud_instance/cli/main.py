@@ -9,19 +9,37 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
+import json
 
 import typer
 
 # import cloud_instance.cli.util
-from cloud_instance.models.main import gather_current_deployment, create, return_to_be_deleted_vms
+from cloud_instance.models import main
 
 # import cloud_instance.utils.common
 from cloud_instance.cli.dep import EPILOG, Param
 
 from .. import __version__
 
+# setup global logger
 logger = logging.getLogger("cloud_instance")
+logger.setLevel(logging.INFO)
 
+# create console handler and set level to debug
+ch = logging.FileHandler(filename="/tmp/cloud_instance.log")
+ch.setLevel(logging.INFO)
+
+# create formatter
+formatter = logging.Formatter(
+    "%(asctime)s [%(levelname)s] (%(threadName)s) %(lineno)d %(message)s"
+)
+
+# add formatter to ch
+ch.setFormatter(formatter)
+
+# add ch to logger
+logger.addHandler(ch)
+logger.removeHandler(logger.handlers[0])  # Remove the console output
 
 app = typer.Typer(
     epilog=EPILOG,
@@ -42,8 +60,8 @@ class LogLevel(str, Enum):
     error = "error"
 
 
-@app.command(help="gather existing VMs")
-def gather_existing_vms(
+@app.command(help="gather a list of all existing VMs in the specified deployment_id")
+def gather_current_deployment(
     deployment_id: str = typer.Option(
         ...,
         "-d",
@@ -51,7 +69,7 @@ def gather_existing_vms(
         help="The deployment_id",
     ),
 ):
-    result = gather_current_deployment(deployment_id)
+    result = main.gather_current_deployment(deployment_id)
 
     print(json.dumps(result))
 
@@ -95,19 +113,20 @@ def create(
         help="Whether to preserve existing VMs.",
     ),
     log_level: LogLevel = Param.LogLevel,
-):
-    logger.setLevel(log_level.upper())
-
+):    
+    #logger.setLevel(log_level.upper())
+    
     logger.debug("Executing run()")
 
-    result = create(
+    result = main.create(
         deployment_id,
-        deployment,
-        defaults,
+        json.loads(deployment),
+        json.loads(defaults),
         preserve,
     )
 
-    print(json.dumps(result))
+
+    print(json.dumps(result, indent=4))
 
 
 def _version_callback(value: bool) -> None:

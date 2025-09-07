@@ -1,23 +1,8 @@
 import logging
 
 # setup global logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = logging.getLogger("cloud_instance")
 
-# create console handler and set level to debug
-ch = logging.FileHandler(filename="/tmp/cloud_instance.log")
-ch.setLevel(logging.INFO)
-
-# create formatter
-formatter = logging.Formatter(
-    "%(asctime)s [%(levelname)s] (%(threadName)s) %(lineno)d %(message)s"
-)
-
-# add formatter to ch
-ch.setFormatter(formatter)
-
-# add ch to logger
-logger.addHandler(ch)
 
 from .fetch import fetch_all
 from .destroy import destroy_all
@@ -59,12 +44,19 @@ def create(
         current_instances,
     )
 
-    new_instances, errors = provision(new_vms)
+    logger.info(f"{current_vms=}")
+    logger.info(f"{surplus_vms=}")
+    logger.info(f"{new_vms=}")
+    
+    logger.info("Provisioning new_vms...")
+    new_instances, errors = provision(new_vms, defaults)
         
-      
+
     if not preserve:
+       logger.info("Destroying surplus_vms...")
        destroy_all(surplus_vms)
 
+    logger.info(f"{new_instances=}")
 
     if errors:
         raise ValueError(errors)

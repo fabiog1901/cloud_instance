@@ -31,6 +31,7 @@ logger = logging.getLogger("cloud_instance")
 
 instances: list[dict] = []
 errors: list[str] = []
+defaults: dict = {}
 
 
 def update_new_deployment(_instances: list):
@@ -45,7 +46,7 @@ def update_errors(error: str):
     with Lock():
         errors.append(error)
 
-def get_instance_type(group: dict, instance_defaults: dict):
+def get_instance_type(group: dict):
     if "instance_type" in group:
         return group["instance_type"]
 
@@ -57,7 +58,9 @@ def get_instance_type(group: dict, instance_defaults: dict):
 
     mem = str(group["instance"].get("mem", "default"))
     cloud = group["cloud"]
-    return instance_defaults[cloud][cpu][mem]
+    global defaults
+    
+    return defaults[cloud][cpu][mem]
 
 
 def wait_for_extended_operation(operation: ExtendedOperation):
@@ -68,7 +71,10 @@ def wait_for_extended_operation(operation: ExtendedOperation):
 
     return result
 
-def provision(new_vms: list[Thread]):
+def provision(new_vms: list[Thread], instance_defaults):
+    global defaults
+    defaults = instance_defaults
+    
     for x in new_vms:
         x.start()
     
@@ -77,6 +83,7 @@ def provision(new_vms: list[Thread]):
     
     global instances
     global errors
+    
     
     return instances, errors
     
@@ -205,9 +212,13 @@ def provision_aws_vm(deployment_id: str, cluster_name: str, group: dict, x: int)
         update_errors(e)
 
 
-def provision_gcp_vm(deployment_id: str, cluster_name: str, group: dict, x: int, gcp_project: str):
+def provision_gcp_vm(deployment_id: str, cluster_name: str, group: dict, x: int):
     logger.debug("++gcp %s %s %s" % (cluster_name, group["group_name"], x))
 
+    gcp_project = os.getenv('GCP_PROJECT')
+    if not gcp_project:
+        raise ValueError('GCP_PROJECT env var is not defined')
+        
     gcpzone = "-".join([group["region"], group["zone"]])
 
     instance_name = deployment_id + "-" + str(random.randint(0, 1e16)).zfill(16)

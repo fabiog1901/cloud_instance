@@ -16,9 +16,7 @@ logger = logging.getLogger("cloud_instance")
 errors: list[str] = []
 
 
-def destroy_all(
-    instances: list, gcp_project: str, azure_subscription_id, azure_resource_group
-):
+def destroy_all(instances: list):
     threads: list[Thread] = []
 
     for x in instances:
