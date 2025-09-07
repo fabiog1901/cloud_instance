@@ -59,13 +59,13 @@ def gather_existing_vms(
 @app.command(help="Return VMs slated to be deleted")
 def return_to_be_deleted_vms(
     deployment_id: str = typer.Option(
-        None,
+        ...,
         "-d",
         "--deployment-id",
         help="The deployment_id",
     ),
     deployment: str = typer.Option(
-        None,
+        ...,
         help="deployment",
     ),
 ):
@@ -75,17 +75,17 @@ def return_to_be_deleted_vms(
 @app.command(help="Create the deployment", epilog=EPILOG, no_args_is_help=True)
 def create(
     deployment_id: str = typer.Option(
-        None,
+        ...,
         "-d",
         "--deployment-id",
         help="The deployment_id",
     ),
     deployment: str = typer.Option(
-        None,
+        ...,
         help="deployment",
     ),
     defaults: str = typer.Option(
-        None,
+        ...,
         help="defaults",
     ),
     preserve: bool = typer.Option(

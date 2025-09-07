@@ -22,18 +22,14 @@ def destroy_all(
     threads: list[Thread] = []
 
     for x in instances:
-        if x["cloud"] == "aws":
-            thread = Thread(target=destroy_aws_vm, args=(x,))
-        elif x["cloud"] == "gcp":
-            thread = Thread(target=destroy_gcp_vm, args=(x, gcp_project))
-        elif x["cloud"] == "azure":
-            thread = Thread(
-                target=destroy_azure_vm,
-                args=(x, azure_subscription_id, azure_resource_group),
-            )
-        else:
-            update_errors(f"cloud not supported: {x['cloud']}")
-
+        thread = Thread(
+            target={
+                "aws": destroy_aws_vm,
+                "gcp": destroy_gcp_vm,
+                "azure": destroy_azure_vm,
+            }.get(x["cloud"]),
+            args=(x,),
+        )
         thread.start()
         threads.append(thread)
 

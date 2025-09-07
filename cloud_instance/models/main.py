@@ -22,6 +22,7 @@ logger.addHandler(ch)
 from .fetch import fetch_all
 from .destroy import destroy_all
 from .build import build_deployment
+from .provision import provision
 
 
 def gather_current_deployment(
@@ -52,39 +53,24 @@ def create(
         raise ValueError(errors)
 
     logger.info("Building deployment...")
-    tobedel_instances, threadstobeexec = build_deployment(
+    current_vms, surplus_vms, new_vms = build_deployment(
         deployment_id,
         deployment,
         current_instances,
     )
 
-    if "self.return_tobedeleted_vms":
-        logger.info("Returning list of instances slated to be deleted to client")
-        return current_instances
-
-    if threadstobeexec:
-        logger.info("Creating new VMs...")
-        for x in threadstobeexec:
-            x.start()
-    else:
-        logger.info("No instances to create")
-
-    if current_instances and not preserve:
+    new_instances, errors = provision(new_vms)
         
-        logger.info("Removing instances...")
-        destroy_all(current_instances)
-        current_instances = []
+      
+    if not preserve:
+       destroy_all(surplus_vms)
 
-    logger.info("Waiting for all operation threads to complete")
-    for x in threadstobeexec:
-        x.join()
-    logger.info("All operation threads have completed")
 
     if errors:
         raise ValueError(errors)
 
     logger.info("Returning new deployment list to client")
-    return new_instances + current_instances
+    return new_instances + current_vms
 
 
 def return_to_be_deleted_vms(self) -> list[dict]:

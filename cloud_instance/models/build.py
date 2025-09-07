@@ -4,35 +4,18 @@ from .provision import provision_aws_vm, provision_gcp_vm, provision_azure_vm
 
 logger = logging.getLogger("cloud_instance")
 
-new_instances: list[dict] = []
-errors: list[str] = []
-threads: list[Thread]
-
-
-def update_new_deployment(_instances: list):
-    global new_instances
-    with Lock():
-        logger.debug("Updating new instances list")
-        new_instances += _instances
-
-
-def update_errors(error: str):
-    global errors
-    with Lock():
-        errors.append(error)
-
 
 def build_deployment(
     deployment_id: str,
     deployment: list[dict],
-    current_instances,
-    gcp_project,
-    azure_subscription_id,
-    azure_resource_group,
+    current_instances: list[dict],
 ):
     # 4. loop through the 'deployment' struct
     #    - through each cluster and copies
     #    - through each group within each cluster
+    new_vms = []
+    surplus_vms = []
+    current_vms = []
 
     # loop through each cluster item in the deployment list
     for cluster in deployment:
@@ -40,19 +23,18 @@ def build_deployment(
         # then, for each requested copy, add the index suffix
         cluster_name: str = cluster.get("cluster_name", deployment_id)
         for x in range(int(cluster.get("copies", 1))):
-            build_cluster(
+            _current_vms, _surplus_vms, _new_vms = build_cluster(
                 f"{cluster_name}-{x}",
                 cluster,
                 deployment_id,
                 current_instances,
-                gcp_project,
-                azure_subscription_id,
-                azure_resource_group,
             )
+            new_vms += _new_vms
+            surplus_vms += _surplus_vms
+            current_vms += _current_vms
 
-    global threads
-    global new_instances
-    return new_instances, threads
+
+    return current_vms, surplus_vms, new_vms
 
 
 def build_cluster(
@@ -60,22 +42,25 @@ def build_cluster(
     cluster: dict,
     deployment_id,
     current_instances,
-    gcp_project,
-    azure_subscription_id,
-    azure_resource_group,
 ):
     # for each group in the cluster,
     # put all cluster defaults into the group
+    new_vms = []
+    surplus_vms = []
+    current_vms = []
+    
     for group in cluster.get("groups", []):
-        build_group(
+        _current_vms, _surplus_vms, _new_vms = build_group(
             cluster_name,
             merge_dicts(cluster, group),
             current_instances,
             deployment_id,
-            gcp_project,
-            azure_subscription_id,
-            azure_resource_group,
         )
+        new_vms += _new_vms
+        surplus_vms += _surplus_vms
+        current_vms += _current_vms
+
+    return current_vms, surplus_vms, new_vms
 
 
 def build_group(
@@ -83,9 +68,6 @@ def build_group(
     group: dict,
     current_instances: list[dict],
     deployment_id,
-    gcp_project,
-    azure_subscription_id,
-    azure_resource_group,
 ):
     # 5. for each group, compare what is in 'deployment' to what is in 'current_deployment':
     #     case NO DIFFERENCE
@@ -100,70 +82,42 @@ def build_group(
     #        return current_deployment minus what was distroyed
 
     # get all instances in the current group
-    current_group = []
+    current_vms = []
+    new_vms = []
+    surplus_vms = []
 
-    for x in current_instances[:]:
+    for x in current_instances:
         if (
             x["cluster_name"] == cluster_name
             and x["group_name"] == group["group_name"]
             and x["region"] == group["region"]
             and x["zone"] == group["zone"]
         ):
-            current_group.append(x)
-            current_instances.remove(x)
+            current_vms.append(x)
 
-    current_count = len(current_group)
+    current_count = len(current_vms)
     new_exact_count = int(group.get("exact_count", 0))
 
-    # CASE 1
-    if current_count == new_exact_count:
-        pass
-
-    # CASE 2: ADD instances
-    elif current_count < new_exact_count:
-
+    # ADD instances
+    if current_count < new_exact_count:
         for x in range(new_exact_count - current_count):
-
-            if group["cloud"] == "aws":
-                thread = Thread(
-                    target=provision_aws_vm,
+            new_vms.append(
+                Thread(
+                    target={
+                        "aws": provision_aws_vm,
+                        "gcp": provision_gcp_vm,
+                        "azure": provision_azure_vm,
+                    }.get(group["cloud"]),
                     args=(deployment_id, cluster_name, group, x),
                 )
-            elif group["cloud"] == "gcp":
-                thread = Thread(
-                    target=provision_gcp_vm,
-                    args=(deployment_id, cluster_name, group, x, gcp_project),
-                )
-            elif group["cloud"] == "azure":
-                thread = Thread(
-                    target=provision_azure_vm,
-                    args=(
-                        deployment_id,
-                        cluster_name,
-                        group,
-                        x,
-                        azure_subscription_id,
-                        azure_resource_group,
-                    ),
-                )
-            else:
-                pass
+            )
 
-            # thread.start()
-            global threads
-            threads.append(thread)
-
-    # CASE 3: REMOVE instances
-    else:
+    # REMOVE instances
+    elif current_count > new_exact_count:
         for x in range(current_count - new_exact_count):
-            current_instances.append(current_group.pop(-1))
+            surplus_vms.append(current_vms.pop(-1))
 
-    update_new_deployment(current_group)
-
-
-# UTIL METHODS
-# =========================================================================
-
+    return current_vms, surplus_vms, new_vms
 
 def merge_dicts(self, parent: dict, child: dict):
     merged = {}

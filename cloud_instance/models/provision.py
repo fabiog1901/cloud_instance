@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import random
-from threading import Lock
+from threading import Lock, Thread
 
 # AWS
 import boto3
@@ -45,7 +45,6 @@ def update_errors(error: str):
     with Lock():
         errors.append(error)
 
-
 def get_instance_type(group: dict, instance_defaults: dict):
     if "instance_type" in group:
         return group["instance_type"]
@@ -69,7 +68,19 @@ def wait_for_extended_operation(operation: ExtendedOperation):
 
     return result
 
-
+def provision(new_vms: list[Thread]):
+    for x in new_vms:
+        x.start()
+    
+    for x in new_vms:
+        x.join()
+    
+    global instances
+    global errors
+    
+    return instances, errors
+    
+    
 def provision_aws_vm(deployment_id: str, cluster_name: str, group: dict, x: int):
     logger.debug("++aws %s %s %s" % (cluster_name, group["region"], x))
 
