@@ -78,6 +78,25 @@ def create(
     return new_instances + current_vms
 
 
+def destroy(
+    deployment_id: str,
+) -> None:
+
+    # fetch all running instances for the deployment_id and append them to the 'instances' list
+    logger.info(f"Fetching all instances with deployment_id = '{deployment_id}'")
+    current_instances, errors = fetch_all(deployment_id)
+
+    logger.info(f"current_instances count={len(current_instances)}")
+    for idx, x in enumerate(current_instances, start=1):
+        logger.info(f"{idx}:\t{x}")
+
+    if errors:
+        raise ValueError(errors)
+
+    logger.info("Destroying all instances")
+    destroy_all(current_instances)
+
+
 def return_to_be_deleted_vms(self) -> list[dict]:
 
     # fetch all running instances for the deployment_id and append them to the 'instances' list

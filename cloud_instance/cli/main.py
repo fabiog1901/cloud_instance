@@ -127,6 +127,19 @@ def create(
     print(json.dumps(result))
 
 
+@app.command(help="Destroy the deployment", epilog=EPILOG, no_args_is_help=True)
+def destroy(
+    deployment_id: str = typer.Option(
+        ...,
+        "-d",
+        "--deployment-id",
+        help="The deployment_id",
+    ),
+    log_level: LogLevel = Param.LogLevel,
+):
+    main.destroy(deployment_id)
+
+
 def _version_callback(value: bool) -> None:
     if value:
         typer.echo(f"dbworkload : {__version__}")
