@@ -1,17 +1,17 @@
 import logging
-from threading import Thread, Lock
 import os
+from threading import Lock, Thread
 
 # AWS
 import boto3
-
-# GCP
-from google.cloud.compute_v1 import InstancesClient, AggregatedListInstancesRequest
 
 # AZURE
 from azure.identity import EnvironmentCredential
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.network import NetworkManagementClient
+
+# GCP
+from google.cloud.compute_v1 import AggregatedListInstancesRequest, InstancesClient
 
 from .parse import parse_aws_query, parse_azure_query, parse_gcp_query
 
@@ -20,44 +20,42 @@ logger = logging.getLogger("cloud_instance")
 instances: list[dict] = []
 errors: list[str] = []
 
-def fetch_all(
-        deployment_id: str
-    ):
-        threads: list[Thread] = []
-        global instances
-        global errors
-        
-        # AWS
-        thread = Thread(
-            target=fetch_aws_instances, args=(deployment_id,)
-        )
-        thread.start()
-        threads.append(thread)
 
-        # GCP
-        thread = Thread(
-            target=fetch_gcp_instances,
-            args=(deployment_id,),
-        )
-        thread.start()
-        threads.append(thread)
+def fetch_all(deployment_id: str):
+    threads: list[Thread] = []
+    global instances
+    global errors
 
-        # AZURE
-        # if azure_resource_group:
-        #     thread = Thread(
-        #         target=fetch_azure_instances, args=(deployment_id,)
-        #     )
-        #     thread.start()
-        #     threads.append(thread)
+    # AWS
+    thread = Thread(target=fetch_aws_instances, args=(deployment_id,))
+    thread.start()
+    threads.append(thread)
 
-        # wait for all threads to complete
-        for x in threads:
-            x.join()
-            
-        # sort instances to ensure list is deterministic
-        instances = sorted(instances, key=lambda d: d['id'])
-        
-        return instances, errors
+    # GCP
+    thread = Thread(
+        target=fetch_gcp_instances,
+        args=(deployment_id,),
+    )
+    thread.start()
+    threads.append(thread)
+
+    # AZURE
+    # if azure_resource_group:
+    #     thread = Thread(
+    #         target=fetch_azure_instances, args=(deployment_id,)
+    #     )
+    #     thread.start()
+    #     threads.append(thread)
+
+    # wait for all threads to complete
+    for x in threads:
+        x.join()
+
+    # sort instances to ensure list is deterministic
+    instances = sorted(instances, key=lambda d: d["id"])
+
+    return instances, errors
+
 
 def update_instances_list(_instances: list):
     global instances
@@ -65,10 +63,12 @@ def update_instances_list(_instances: list):
         logger.debug("Updating instances list")
         instances += _instances
 
+
 def update_errors(error: str):
     global errors
     with Lock():
         errors.append(error)
+
 
 def fetch_aws_instances(deployment_id: str):
     logger.debug(f"Fetching AWS instances for deployment_id = '{deployment_id}'")
@@ -91,7 +91,7 @@ def fetch_aws_instances(deployment_id: str):
             )
 
             aws_instances: list = parse_aws_query(response)
-            
+
         except Exception as e:
             update_errors(e)
 
@@ -113,7 +113,7 @@ def fetch_aws_instances(deployment_id: str):
 
         for x in threads:
             x.join()
-            
+
     except Exception as e:
         update_errors(e)
         # update_errors(
@@ -123,6 +123,7 @@ def fetch_aws_instances(deployment_id: str):
         #         "msg": str(e.args),
         #     }
         # )
+
 
 def fetch_gcp_instances(deployment_id: str):
     """
@@ -136,10 +137,11 @@ def fetch_gcp_instances(deployment_id: str):
     """
     logger.debug(f"Fetching GCP instances for deployment_id = '{deployment_id}'")
 
-    project_id = os.environ.get("GCP_PROJECT", None)
+    project_id = os.getenv("GCP_PROJECT")
     if not project_id:
+        logger.warning("Env var GCP_PROJECT is not set")
         return
-    
+
     instance_client = InstancesClient()
     # Use the `max_results` parameter to limit the number of results that the API returns per response page.
     request = AggregatedListInstancesRequest(
@@ -162,7 +164,8 @@ def fetch_gcp_instances(deployment_id: str):
     if instances:
         update_instances_list(instances)
 
-'''
+
+"""
 def fetch_azure_instance_network_config(self, vm):
     try:
         credential = EnvironmentCredential()
@@ -230,4 +233,4 @@ def fetch_azure_instances(self, deployment_id: str):
     for x in threads:
         x.join()
 
-'''
+"""

@@ -9,15 +9,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
-import json
 
 import typer
 
-# import cloud_instance.cli.util
-from cloud_instance.models import main
-
 # import cloud_instance.utils.common
 from cloud_instance.cli.dep import EPILOG, Param
+
+# import cloud_instance.cli.util
+from cloud_instance.models import main
 
 from .. import __version__
 
@@ -31,7 +30,7 @@ ch.setLevel(logging.INFO)
 
 # create formatter
 formatter = logging.Formatter(
-    "%(asctime)s [%(levelname)s] (%(threadName)s) %(lineno)d %(message)s"
+    "%(asctime)s [%(levelname)s] (%(threadName)s) %(filename)s:%(lineno)d %(message)s"
 )
 
 # add formatter to ch
@@ -113,9 +112,9 @@ def create(
         help="Whether to preserve existing VMs.",
     ),
     log_level: LogLevel = Param.LogLevel,
-):    
-    #logger.setLevel(log_level.upper())
-    
+):
+    # logger.setLevel(log_level.upper())
+
     logger.debug("Executing run()")
 
     result = main.create(
@@ -125,8 +124,7 @@ def create(
         preserve,
     )
 
-
-    print(json.dumps(result, indent=4))
+    print(json.dumps(result))
 
 
 def _version_callback(value: bool) -> None:

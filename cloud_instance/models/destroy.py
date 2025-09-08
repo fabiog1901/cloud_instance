@@ -1,15 +1,16 @@
 import logging
-from threading import Thread, Lock
+import os
+from threading import Lock, Thread
 
 # AWS
 import boto3
 
-# GCP
-from google.cloud.compute_v1 import InstancesClient
-
 # AZURE
 from azure.identity import EnvironmentCredential
 from azure.mgmt.compute import ComputeManagementClient
+
+# GCP
+from google.cloud.compute_v1 import InstancesClient
 
 logger = logging.getLogger("cloud_instance")
 
@@ -30,6 +31,7 @@ def destroy_all(instances: list):
         )
         thread.start()
         threads.append(thread)
+        logger.info(f"Destroying instance: {x}")
 
     for x in threads:
         x.join()
@@ -90,8 +92,12 @@ def destroy_aws_vm(instance: dict):
         update_errors(e)
 
 
-def destroy_gcp_vm(instance: dict, gcp_project):
+def destroy_gcp_vm(instance: dict):
     logger.debug(f"--gcp {instance['id']}")
+
+    gcp_project = os.getenv("GCP_PROJECT")
+    if not gcp_project:
+        raise ValueError("Env var GCP_PROJECT not set.")
 
     try:
         instance_client = InstancesClient()
@@ -109,8 +115,11 @@ def destroy_gcp_vm(instance: dict, gcp_project):
         update_errors(e)
 
 
-def destroy_azure_vm(instance: dict, azure_subscription_id, azure_resource_group):
+def destroy_azure_vm(instance: dict):
     logger.debug(f"--azure {instance['id']}")
+
+    azure_subscription_id = os.getenv("AZURE_SUBSCRIPTION_ID")
+    azure_resource_group = os.getenv("AZURE_RESOURCE_GROUP")
 
     # Acquire a credential object using CLI-based authentication.
     try:

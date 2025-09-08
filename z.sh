@@ -1,18 +1,4 @@
-# cloud_instance
-
-Usage:
-
-```text
-cloud_instance create \
-  -d <deployment_id> 
-  --deployment <deployment> \
-  --defaults <defaults>
-```
-
-Example:
-
-```bash
-cloud_instance create \
+poetry run cloud_instance create \
     -d fabio1 \
     --deployment \
     '[
@@ -36,7 +22,7 @@ cloud_instance create \
                     "region": "us-east4",
                     "vpc_id": "default",
                     "security_groups": ["cockroachdb"],
-                    "zone": "b",
+                    "zone": "a",
                     "subnet": "default"
                 }
             ]
@@ -80,29 +66,4 @@ cloud_instance create \
                 }
             }
         }' | jq
-```
 
-Output, formatted thanks to `jq`:
-
-```json
-[
-  {
-    "id": "fabio1-7141637722071383",
-    "cloud": "gcp",
-    "region": "us-east4",
-    "zone": "a",
-    "public_ip": "35.245.214.0",
-    "public_hostname": "0.214.245.35.bc.googleusercontent.com",
-    "private_ip": "10.150.15.208",
-    "private_hostname": "fabio1-7141637722071383.c.my-team.internal",
-    "ansible_user": "ubuntu",
-    "inventory_groups": [
-      "haproxy",
-      "fabio1-0"
-    ],
-    "cluster_name": "fabio1-0",
-    "group_name": "haproxy",
-    "extra_vars": "{}"
-  }
-]
-```

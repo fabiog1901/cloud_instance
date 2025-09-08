@@ -111,11 +111,11 @@ class CloudInstance:
         # wait for all threads to complete
         for x in self.threads:
             x.join()
-        
+
         self.threads = []
-            
+
         # sort self.instances to ensure list is deterministic
-        self.instances = sorted(self.instances, key=lambda d: d['id'])
+        self.instances = sorted(self.instances, key=lambda d: d["id"])
 
     def parse_aws_query(self, response):
         instances: list = []
@@ -441,7 +441,7 @@ class CloudInstance:
                 thread = threading.Thread(
                     target=target[group["cloud"]], args=(cluster_name, group, x)
                 )
-                #thread.start()
+                # thread.start()
                 self.threads.append(thread)
 
         # CASE 3: REMOVE instances
@@ -559,11 +559,13 @@ class CloudInstance:
             # wait until instance is running
             waiter = ec2.get_waiter("instance_running")
             waiter.wait(InstanceIds=[response["Instances"][0]["InstanceId"]])
-            
-            allocation = ec2.allocate_address(Domain='vpc')
-            resp = ec2.associate_address(AllocationId=allocation['AllocationId'],
-                                                InstanceId=response["Instances"][0]["InstanceId"])
-            
+
+            allocation = ec2.allocate_address(Domain="vpc")
+            resp = ec2.associate_address(
+                AllocationId=allocation["AllocationId"],
+                InstanceId=response["Instances"][0]["InstanceId"],
+            )
+
             # fetch details about the newly created instance
             response = ec2.describe_instances(
                 InstanceIds=[response["Instances"][0]["InstanceId"]]
@@ -903,34 +905,38 @@ class CloudInstance:
             self.threads.append(thread)
 
     def destroy_aws_vm(self, instance: dict):
-        
+
         def get_allocation_id(public_ip, instance_id):
             response = ec2.describe_addresses(PublicIps=[public_ip])
 
-            for address in response['Addresses']:
+            for address in response["Addresses"]:
                 # Check if the EIP is associated with the given instance ID
-                if address.get('InstanceId') == instance_id:
-                    public_ip = address.get('PublicIp')
-                    allocation_id = address.get('AllocationId')
-                    print(f"Instance {instance_id} has EIP {public_ip} with Allocation ID {allocation_id}")
+                if address.get("InstanceId") == instance_id:
+                    public_ip = address.get("PublicIp")
+                    allocation_id = address.get("AllocationId")
+                    print(
+                        f"Instance {instance_id} has EIP {public_ip} with Allocation ID {allocation_id}"
+                    )
                     return allocation_id
 
-            raise ValueError(f"No Elastic IP found associated with instance {instance_id}")
-            
+            raise ValueError(
+                f"No Elastic IP found associated with instance {instance_id}"
+            )
+
         logger.debug(f"--aws {instance['id']}")
 
         try:
             ec2 = boto3.client("ec2", region_name=instance["region"])
 
             alloc = get_allocation_id(instance["public_ip"], instance["id"])
-            
+
             response = ec2.terminate_instances(
                 InstanceIds=[instance["id"]],
             )
 
             waiter = ec2.get_waiter("instance_terminated")
             waiter.wait(InstanceIds=[instance["id"]])
-    
+
             status = response["TerminatingInstances"][0]["CurrentState"]["Name"]
 
             if status in ["shutting-down", "terminated"]:
@@ -940,7 +946,7 @@ class CloudInstance:
                 self.log_error(response)
 
             ec2.release_address(AllocationId=alloc)
-            
+
         except Exception as e:
             logger.error(e)
             self.log_error(e)
@@ -1053,7 +1059,7 @@ class CloudInstance:
         return result
 
     def run(self) -> list[dict]:
-        
+
         # fetch all running instances for the deployment_id and append them to the 'instances' list
         logger.info(
             f"Fetching all instances with deployment_id = '{self.deployment_id}'"
@@ -1062,17 +1068,17 @@ class CloudInstance:
 
         if self.errors:
             raise ValueError(self.errors)
-        
+
         if self.instances:
             logger.info("Listing pre-existing instances:")
             for x in self.instances:
                 logger.info(f"\t{x}")
         else:
             logger.info("No pre-existing instances")
-            
+
         if self.errors:
             raise ValueError(self.errors)
-            
+
         if self.gather_current_deployment_only:
             return self.instances
 
@@ -1082,13 +1088,12 @@ class CloudInstance:
             self.build_deployment()
 
         # at this point, `instances` only has surplus vms that will be deleted
-           
-                
+
         if self.return_tobedeleted_vms:
             logger.info("Listing instances slated for deletion")
             for x in self.instances:
                 logger.info(f"\t{x}")
-                
+
             logger.info("Returning list of instances slated to be deleted to client")
             return self.instances
 
@@ -1098,12 +1103,12 @@ class CloudInstance:
                 x.start()
         else:
             logger.info("No instances to create")
-                
+
         if self.instances and not self.preserve_existing_vms:
             logger.info("Listing instances slated for deletion")
             for x in self.instances:
                 logger.info(f"\t{x}")
-                
+
             logger.info("Removing instances...")
             self.destroy_all(self.instances)
             self.instances = []
@@ -1168,7 +1173,7 @@ def main():
         type=str_to_bool,
         help="Only gather the current list of VMs without creating or deleting (yes/no/true/false)",
     )
-    
+
     parser.add_argument(
         "--mod",
         required=False,
@@ -1192,18 +1197,16 @@ def main():
     )
 
     args = parser.parse_args()
-    
-    
+
     if args.mod:
         ec2 = boto3.client("ec2", region_name=args.mod_region)
-        
+
         print(f"Stopping instance {args.mod}...")
         ec2.stop_instances(InstanceIds=[args.mod])
         waiter = ec2.get_waiter("instance_stopped")
         waiter.wait(InstanceIds=[args.mod])
         print("Instance stopped.")
 
-        
         print(f"Modifying instance {args.mod} to type {new_type}...")
         ec2.modify_instance_attribute(
             InstanceId=args.mod, InstanceType={"Value": new_type}

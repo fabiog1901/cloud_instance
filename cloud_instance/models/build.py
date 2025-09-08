@@ -1,14 +1,17 @@
 import logging
-from threading import Thread, Lock
-from .provision import provision_aws_vm, provision_gcp_vm, provision_azure_vm
+from threading import Lock, Thread
+
+from .provision import provision_aws_vm, provision_azure_vm, provision_gcp_vm
 
 logger = logging.getLogger("cloud_instance")
+
+current_instances: list[dict] = []
 
 
 def build_deployment(
     deployment_id: str,
     deployment: list[dict],
-    current_instances: list[dict],
+    _current_instances: list[dict],
 ):
     # 4. loop through the 'deployment' struct
     #    - through each cluster and copies
@@ -16,6 +19,9 @@ def build_deployment(
     new_vms = []
     surplus_vms = []
     current_vms = []
+
+    global current_instances
+    current_instances = _current_instances
 
     # loop through each cluster item in the deployment list
     for cluster in deployment:
@@ -27,33 +33,29 @@ def build_deployment(
                 f"{cluster_name}-{x}",
                 cluster,
                 deployment_id,
-                current_instances,
             )
             new_vms += _new_vms
             surplus_vms += _surplus_vms
             current_vms += _current_vms
 
-
-    return current_vms, surplus_vms, new_vms
+    return current_vms, surplus_vms + current_instances, new_vms
 
 
 def build_cluster(
     cluster_name: str,
     cluster: dict,
     deployment_id,
-    current_instances,
 ):
     # for each group in the cluster,
     # put all cluster defaults into the group
     new_vms = []
     surplus_vms = []
     current_vms = []
-    
+
     for group in cluster.get("groups", []):
         _current_vms, _surplus_vms, _new_vms = build_group(
             cluster_name,
             merge_dicts(cluster, group),
-            current_instances,
             deployment_id,
         )
         new_vms += _new_vms
@@ -66,7 +68,6 @@ def build_cluster(
 def build_group(
     cluster_name: str,
     group: dict,
-    current_instances: list[dict],
     deployment_id,
 ):
     # 5. for each group, compare what is in 'deployment' to what is in 'current_deployment':
@@ -82,9 +83,11 @@ def build_group(
     #        return current_deployment minus what was distroyed
 
     # get all instances in the current group
-    current_vms = []
+    current_group = []
     new_vms = []
     surplus_vms = []
+
+    global current_instances
 
     for x in current_instances:
         if (
@@ -93,9 +96,10 @@ def build_group(
             and x["region"] == group["region"]
             and x["zone"] == group["zone"]
         ):
-            current_vms.append(x)
+            current_group.append(x)
+            current_instances.remove(x)
 
-    current_count = len(current_vms)
+    current_count = len(current_group)
     new_exact_count = int(group.get("exact_count", 0))
 
     # ADD instances
@@ -115,9 +119,10 @@ def build_group(
     # REMOVE instances
     elif current_count > new_exact_count:
         for x in range(current_count - new_exact_count):
-            surplus_vms.append(current_vms.pop(-1))
+            surplus_vms.append(current_group.pop(-1))
 
-    return current_vms, surplus_vms, new_vms
+    return current_group, surplus_vms, new_vms
+
 
 def merge_dicts(parent: dict, child: dict):
     merged = {}

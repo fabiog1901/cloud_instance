@@ -7,25 +7,25 @@ from threading import Lock, Thread
 # AWS
 import boto3
 
-# GCP
-from google.cloud.compute_v1 import (
-    InstancesClient,
-    Instance,
-    Tags,
-    AttachedDiskInitializeParams,
-    NetworkInterface,
-    AccessConfig,
-    AttachedDisk,
-)
-from google.cloud.compute_v1.types import Items, Metadata
-
 # AZURE
 from azure.identity import EnvironmentCredential
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.network import NetworkManagementClient
 from google.api_core.extended_operation import ExtendedOperation
 
-from .parse import parse_aws_query, parse_gcp_query, parse_azure_query
+# GCP
+from google.cloud.compute_v1 import (
+    AccessConfig,
+    AttachedDisk,
+    AttachedDiskInitializeParams,
+    Instance,
+    InstancesClient,
+    NetworkInterface,
+    Tags,
+)
+from google.cloud.compute_v1.types import Items, Metadata
+
+from .parse import parse_aws_query, parse_azure_query, parse_gcp_query
 
 logger = logging.getLogger("cloud_instance")
 
@@ -46,6 +46,7 @@ def update_errors(error: str):
     with Lock():
         errors.append(error)
 
+
 def get_instance_type(group: dict):
     if "instance_type" in group:
         return group["instance_type"]
@@ -59,7 +60,7 @@ def get_instance_type(group: dict):
     mem = str(group["instance"].get("mem", "default"))
     cloud = group["cloud"]
     global defaults
-    
+
     return defaults[cloud][cpu][mem]
 
 
@@ -71,23 +72,23 @@ def wait_for_extended_operation(operation: ExtendedOperation):
 
     return result
 
+
 def provision(new_vms: list[Thread], instance_defaults):
     global defaults
     defaults = instance_defaults
-    
+
     for x in new_vms:
         x.start()
-    
+
     for x in new_vms:
         x.join()
-    
+
     global instances
     global errors
-    
-    
+
     return instances, errors
-    
-    
+
+
 def provision_aws_vm(deployment_id: str, cluster_name: str, group: dict, x: int):
     logger.debug("++aws %s %s %s" % (cluster_name, group["region"], x))
 
@@ -215,10 +216,10 @@ def provision_aws_vm(deployment_id: str, cluster_name: str, group: dict, x: int)
 def provision_gcp_vm(deployment_id: str, cluster_name: str, group: dict, x: int):
     logger.debug("++gcp %s %s %s" % (cluster_name, group["group_name"], x))
 
-    gcp_project = os.getenv('GCP_PROJECT')
+    gcp_project = os.getenv("GCP_PROJECT")
     if not gcp_project:
-        raise ValueError('GCP_PROJECT env var is not defined')
-        
+        raise ValueError("GCP_PROJECT env var is not defined")
+
     gcpzone = "-".join([group["region"], group["zone"]])
 
     instance_name = deployment_id + "-" + str(random.randint(0, 1e16)).zfill(16)
@@ -362,7 +363,14 @@ def provision_gcp_vm(deployment_id: str, cluster_name: str, group: dict, x: int)
         update_errors(e)
 
 
-def provision_azure_vm(deployment_id: str, cluster_name: str, group: dict, x: int, azure_subscription_id, azure_resource_group):
+def provision_azure_vm(
+    deployment_id: str,
+    cluster_name: str,
+    group: dict,
+    x: int,
+    azure_subscription_id,
+    azure_resource_group,
+):
     logger.debug("++azure %s %s %s" % (cluster_name, group["group_name"], x))
 
     try:
@@ -370,9 +378,7 @@ def provision_azure_vm(deployment_id: str, cluster_name: str, group: dict, x: in
         credential = EnvironmentCredential()
         client = ComputeManagementClient(credential, azure_subscription_id)
 
-        instance_name = (
-            deployment_id + "-" + str(random.randint(0, 1e16)).zfill(16)
-        )
+        instance_name = deployment_id + "-" + str(random.randint(0, 1e16)).zfill(16)
 
         def get_type(x):
             return {
