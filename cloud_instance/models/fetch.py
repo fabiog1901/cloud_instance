@@ -95,7 +95,7 @@ def fetch_aws_instances(deployment_id: str):
         except Exception as e:
             update_errors(e)
 
-        if instances:
+        if aws_instances:
             update_instances_list(aws_instances)
 
     try:

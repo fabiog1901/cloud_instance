@@ -5,13 +5,42 @@
   gather_facts: no
   become: no
   vars:
-    deployment_id: fabio1
+    deployment_id: fabio-oddball
     deployment: 
+      # - cluster_name: fabio1
+      #   copies: 1
+      #   inventory_groups:
+      #     - haproxy
+      #   exact_count: 1
+      #   instance:
+      #     cpu: 1
+      #   volumes:
+      #     os:
+      #       size: 20
+      #       type: standard_ssd
+      #     data: []
+      #   tags:
+      #     Name: fabio1-lb
+      #   project: my-team
+      #   groups:
+      #     - user: ubuntu
+      #       public_ip: true
+      #       public_key_id: workshop
+      #       tags:
+      #         owner: fabio
+      #       cloud: aws
+      #       image: /canonical/ubuntu/server/24.04
+      #       region: ca-central-1
+      #       vpc_id: vpc-0289741dc46c80da8
+      #       security_groups:
+      #         - sg-0e3631bbd91d95940
+      #       zone: b
+      #       subnet: subnet-057e35614fa949783
       - cluster_name: fabio1
         copies: 1
         inventory_groups:
           - haproxy
-        exact_count: 1
+        exact_count: 0
         instance:
           cpu: 1
         volumes:
@@ -39,17 +68,26 @@
   tasks:
     - name: Ensure presence of instances
       shell: |
-        cloud_instance \
+        # cloud_instance gather-current-deployment -d fabio-oddball
+
+        # cloud_instance modify-instance-type \
+        #   -d {{ deployment_id }} \
+        #   --cpu-count 2 \
+        #   --pause-between 7 \
+        #   --filter-by-groups haproxy \
+        #   --defaults '{{ defaults | to_json }}'
+
+        cloud_instance create \
           -d {{ deployment_id }} \
-          --deployment '{{ deployment | to_json }}' 
+          --deployment '{{ deployment | to_json }}' \
           --defaults '{{ defaults | to_json }}'
       vars:
         defaults:
           aws:
-            '4':
-              default: m6i.xlarge
-            '8':
-              default: m6i.2xlarge
+            '1':
+              default: t3.micro
+            '2':
+              default: t3.large
           azure:
             '4':
               default: Standard_D4s_v3
@@ -58,11 +96,15 @@
           gcp:
             '1':
               default: e2-micro
-            '8':
-              default: n2-standard-8
+            '2':
+              default: e2-medium
 
       register: instances
 
+    - debug:
+        var: instances.stdout | from_json
+
+    - fail: 
     - name: Wait for SSH to come up
       wait_for:
         host: "{{ item.public_ip }}"

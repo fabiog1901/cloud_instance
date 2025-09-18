@@ -86,7 +86,12 @@ def return_to_be_deleted_vms(
         help="deployment",
     ),
 ):
-    pass
+    result = main.return_to_be_deleted_vms(
+        deployment_id,
+        json.loads(deployment),
+    )
+
+    print(json.dumps(result))
 
 
 @app.command(help="Create the deployment", epilog=EPILOG, no_args_is_help=True)
@@ -127,6 +132,56 @@ def create(
     print(json.dumps(result))
 
 
+@app.command(help="Modify instance type", epilog=EPILOG, no_args_is_help=True)
+def modify_instance_type(
+    deployment_id: str = typer.Option(
+        ...,
+        "-d",
+        "--deployment-id",
+        help="The deployment_id",
+    ),
+    new_cpus_count: int = typer.Option(
+        ...,
+        "-c",
+        "--cpu-count",
+        help="New CPU count.",
+    ),
+    filter_by_groups: str = typer.Option(
+        None,
+        "-f",
+        "--filter-by-groups",
+        help="comma separated list of groups the instance must belong to",
+    ),
+    sequential: bool = typer.Option(
+        True,
+        "--no-sequential",
+        show_default=False,
+        help="Whether to modify instances sequentially.",
+    ),
+    pause_between: int = typer.Option(
+        30,
+        "-p",
+        "--pause-between",
+        help="If sequential, seconds to pause between modifications.",
+    ),
+    defaults: str = typer.Option(
+        ...,
+        help="defaults",
+    ),
+    log_level: LogLevel = Param.LogLevel,
+):
+    # logger.setLevel(log_level.upper())
+
+    main.modify_instance_type(
+        deployment_id,
+        new_cpus_count,
+        filter_by_groups.split(",") if filter_by_groups else [],
+        sequential,
+        pause_between,
+        json.loads(defaults),
+    )
+
+
 @app.command(help="Destroy the deployment", epilog=EPILOG, no_args_is_help=True)
 def destroy(
     deployment_id: str = typer.Option(
@@ -142,8 +197,8 @@ def destroy(
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"dbworkload : {__version__}")
-        typer.echo(f"Python     : {platform.python_version()}")
+        typer.echo(f"cloud_instance : {__version__}")
+        typer.echo(f"Python         : {platform.python_version()}")
         raise typer.Exit()
 
 

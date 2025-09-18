@@ -16,6 +16,7 @@ from google.api_core.extended_operation import ExtendedOperation
 # GCP
 from google.cloud.compute_v1 import (
     AccessConfig,
+    AddressesClient,
     AttachedDisk,
     AttachedDiskInitializeParams,
     Instance,
@@ -23,7 +24,9 @@ from google.cloud.compute_v1 import (
     NetworkInterface,
     Tags,
 )
-from google.cloud.compute_v1.types import Items, Metadata
+from google.cloud.compute_v1.services.addresses.client import AddressesClient
+from google.cloud.compute_v1.services.global_addresses import GlobalAddressesClient
+from google.cloud.compute_v1.types import Address, Items, Metadata
 
 from .parse import parse_aws_query, parse_azure_query, parse_gcp_query
 
@@ -214,7 +217,7 @@ def provision_aws_vm(deployment_id: str, cluster_name: str, group: dict, x: int)
 
 
 def provision_gcp_vm(deployment_id: str, cluster_name: str, group: dict, x: int):
-    logger.debug("++gcp %s %s %s" % (cluster_name, group["group_name"], x))
+    logger.info("++gcp %s %s %s" % (cluster_name, group["group_name"], x))
 
     gcp_project = os.getenv("GCP_PROJECT")
     if not gcp_project:
@@ -225,121 +228,146 @@ def provision_gcp_vm(deployment_id: str, cluster_name: str, group: dict, x: int)
     instance_name = deployment_id + "-" + str(random.randint(0, 1e16)).zfill(16)
 
     instance_client = InstancesClient()
+    addresses_client = AddressesClient()
 
-    # volumes
-    def get_type(x):
-        return {
-            "standard_ssd": "pd-ssd",
-            "premium_ssd": "pd-extreme",
-            "local_ssd": "local-ssd",
-            "standard_hdd": "pd-standard",
-            "premium_hdd": "pd-standard",
-        }.get(x, "pd-ssd")
+    try:
+        op = addresses_client.insert(
+            project=gcp_project,
+            region=group["region"],
+            address_resource=Address(
+                name=f"{instance_name}-eip",
+            ),
+        )
+        wait_for_extended_operation(op)
 
-    vols = []
+        # Get the reserved IP address
+        reserved = addresses_client.get(
+            project=gcp_project,
+            region=group["region"],
+            address=f"{instance_name}-eip",
+        )
+        reserved_ip = reserved.address
 
-    boot_disk = AttachedDisk()
-    boot_disk.boot = True
-    initialize_params = AttachedDiskInitializeParams()
-    initialize_params.source_image = group["image"]
-    initialize_params.disk_size_gb = int(group["volumes"]["os"].get("size", 30))
-    initialize_params.disk_type = "zones/%s/diskTypes/%s" % (
-        gcpzone,
-        get_type(group["volumes"]["os"].get("type", "standard_ssd")),
-    )
-    boot_disk.initialize_params = initialize_params
-    boot_disk.auto_delete = group["volumes"]["os"].get("delete_on_termination", True)
-    vols.append(boot_disk)
-
-    for i, x in enumerate(group["volumes"]["data"]):
-        disk = AttachedDisk()
-        init_params = AttachedDiskInitializeParams()
-        init_params.disk_size_gb = int(x.get("size", 100))
-        disk.device_name = f"disk-{i}"
-
-        # local-ssd peculiarities
-        if get_type(x.get("type", "standard_ssd")) == "local-ssd":
-            disk.type_ = "SCRATCH"
-            disk.interface = "NVME"
-            del init_params.disk_size_gb
-            disk.device_name = f"local-ssd-{i}"
-
-        init_params.disk_type = "zones/%s/diskTypes/%s" % (
-            gcpzone,
-            get_type(x.get("type", "standard_ssd")),
+        logger.info(
+            f"GCP External IP address reserved successfully: {instance_name}-eip"
         )
 
-        disk.initialize_params = init_params
-        disk.auto_delete = x.get("delete_on_termination", True)
+        # volumes
+        def get_type(x):
+            return {
+                "standard_ssd": "pd-ssd",
+                "premium_ssd": "pd-extreme",
+                "local_ssd": "local-ssd",
+                "standard_hdd": "pd-standard",
+                "premium_hdd": "pd-standard",
+            }.get(x, "pd-ssd")
 
-        vols.append(disk)
+        vols = []
 
-    # tags
-    tags = Metadata()
-    item = Items()
-    l = []
+        boot_disk = AttachedDisk()
+        boot_disk.boot = True
+        initialize_params = AttachedDiskInitializeParams()
+        initialize_params.source_image = group["image"]
+        initialize_params.disk_size_gb = int(group["volumes"]["os"].get("size", 30))
+        initialize_params.disk_type = "zones/%s/diskTypes/%s" % (
+            gcpzone,
+            get_type(group["volumes"]["os"].get("type", "standard_ssd")),
+        )
+        boot_disk.initialize_params = initialize_params
+        boot_disk.auto_delete = group["volumes"]["os"].get(
+            "delete_on_termination", True
+        )
+        vols.append(boot_disk)
 
-    for k, v in group.get("tags", {}).items():
+        for i, x in enumerate(group["volumes"]["data"]):
+            disk = AttachedDisk()
+            init_params = AttachedDiskInitializeParams()
+            init_params.disk_size_gb = int(x.get("size", 100))
+            disk.device_name = f"disk-{i}"
+
+            # local-ssd peculiarities
+            if get_type(x.get("type", "standard_ssd")) == "local-ssd":
+                disk.type_ = "SCRATCH"
+                disk.interface = "NVME"
+                del init_params.disk_size_gb
+                disk.device_name = f"local-ssd-{i}"
+
+            init_params.disk_type = "zones/%s/diskTypes/%s" % (
+                gcpzone,
+                get_type(x.get("type", "standard_ssd")),
+            )
+
+            disk.initialize_params = init_params
+            disk.auto_delete = x.get("delete_on_termination", True)
+
+            vols.append(disk)
+
+        # tags
+        tags = Metadata()
         item = Items()
-        item.key = k
-        item.value = v
+        l = []
+
+        for k, v in group.get("tags", {}).items():
+            item = Items()
+            item.key = k
+            item.value = v
+            l.append(item)
+
+        item = Items()
+        item.key = "ansible_user"
+        item.value = group["user"]
         l.append(item)
 
-    item = Items()
-    item.key = "ansible_user"
-    item.value = group["user"]
-    l.append(item)
+        item = Items()
+        item.key = "cluster_name"
+        item.value = cluster_name
+        l.append(item)
 
-    item = Items()
-    item.key = "cluster_name"
-    item.value = cluster_name
-    l.append(item)
+        item = Items()
+        item.key = "group_name"
+        item.value = group["group_name"]
+        l.append(item)
 
-    item = Items()
-    item.key = "group_name"
-    item.value = group["group_name"]
-    l.append(item)
+        item = Items()
+        item.key = "inventory_groups"
+        item.value = json.dumps(group["inventory_groups"] + [cluster_name])
+        l.append(item)
 
-    item = Items()
-    item.key = "inventory_groups"
-    item.value = json.dumps(group["inventory_groups"] + [cluster_name])
-    l.append(item)
+        item = Items()
+        item.key = "extra_vars"
+        item.value = json.dumps(group.get("extra_vars", {}))
+        l.append(item)
 
-    item = Items()
-    item.key = "extra_vars"
-    item.value = json.dumps(group.get("extra_vars", {}))
-    l.append(item)
+        tags.items = l
 
-    tags.items = l
+        # Use the network interface provided in the network_link argument.
+        network_interface = NetworkInterface()
+        network_interface.name = group["subnet"]
 
-    # Use the network interface provided in the network_link argument.
-    network_interface = NetworkInterface()
-    network_interface.name = group["subnet"]
+        if group["public_ip"]:
+            access = AccessConfig()
+            access.type_ = AccessConfig.Type.ONE_TO_ONE_NAT.name
+            access.name = "External NAT"
+            access.network_tier = access.NetworkTier.PREMIUM.name
+            access.nat_i_p = reserved_ip
+            network_interface.access_configs = [access]
 
-    if group["public_ip"]:
-        access = AccessConfig()
-        access.type_ = AccessConfig.Type.ONE_TO_ONE_NAT.name
-        access.name = "External NAT"
-        access.network_tier = access.NetworkTier.PREMIUM.name
+        # Collect information into the Instance object.
+        instance = Instance()
+        instance.name = instance_name
+        instance.disks = vols
+        instance.machine_type = (
+            f"zones/{gcpzone}/machineTypes/{get_instance_type(group)}"
+        )
+        instance.metadata = tags
+        instance.labels = {"deployment_id": deployment_id}
 
-        network_interface.access_configs = [access]
+        t = Tags()
+        t.items = group["security_groups"]
+        instance.tags = t
 
-    # Collect information into the Instance object.
-    instance = Instance()
-    instance.name = instance_name
-    instance.disks = vols
-    instance.machine_type = f"zones/{gcpzone}/machineTypes/{get_instance_type(group)}"
-    instance.metadata = tags
-    instance.labels = {"deployment_id": deployment_id}
+        instance.network_interfaces = [network_interface]
 
-    t = Tags()
-    t.items = group["security_groups"]
-    instance.tags = t
-
-    instance.network_interfaces = [network_interface]
-
-    # Wait for the create operation to complete.
-    try:
         operation = instance_client.insert(
             instance_resource=instance, project=gcp_project, zone=gcpzone
         )

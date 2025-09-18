@@ -11,6 +11,7 @@ from azure.mgmt.compute import ComputeManagementClient
 
 # GCP
 from google.cloud.compute_v1 import InstancesClient
+from google.cloud.compute_v1.services.addresses.client import AddressesClient
 
 logger = logging.getLogger("cloud_instance")
 
@@ -102,13 +103,22 @@ def destroy_gcp_vm(instance: dict):
     try:
         instance_client = InstancesClient()
 
-        operation = instance_client.delete(
+        op = instance_client.delete(
             project=gcp_project,
-            zone="-".join([instance["region"], instance["zone"]]),
+            zone=f"{instance['region']}-{instance['zone']}",
             instance=instance["id"],
         )
-        # self.__wait_for_extended_operation(operation)
-        logger.debug(f"Deleting GCP instance: {instance}")
+        # wait_for_extended_operation(op)
+        logger.info(f"Deleting GCP instance: {instance}")
+
+        client = AddressesClient()
+        op = client.delete(
+            project=gcp_project,
+            region=instance["region"],
+            address=f"{instance['id']}-eip",
+        )
+
+        logger.info(f"GCP External IP address {instance['id']} released successfully.")
 
     except Exception as e:
         logger.error(e)
