@@ -163,7 +163,6 @@ def modify_instance_type(
 
     filtered_instances = []
 
-    logger.info(f"Filtering by groups: {filter_by_groups}")
     for idx, x in enumerate(current_instances, start=1):
         inv_grps = set(x.get("inventory_groups", []))
         if (
@@ -172,7 +171,6 @@ def modify_instance_type(
             and set(filter_by_groups).issubset(inv_grps)
         ):
             filtered_instances.append(x)
-            logger.info(f"{idx}:\t{x}")
 
     modify(
         filtered_instances,

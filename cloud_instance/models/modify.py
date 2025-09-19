@@ -100,43 +100,39 @@ def modify(
 def modify_aws_vm(x: dict, new_cpus_count):
     instance_id = x["id"]
 
-    logger.info(f"modifying {instance_id=} {new_cpus_count=}")
-
     try:
         client = boto3.client("ec2", region_name=x["region"])
+
+        logger.info(f"Modifying {instance_id=} {new_cpus_count=}")
 
         # 1) Stop (required to change type)
         client.stop_instances(InstanceIds=[instance_id])
         client.get_waiter("instance_stopped").wait(InstanceIds=[instance_id])
 
-        logger.info(f"stopped {instance_id}")
+        logger.info(f"Stopped {instance_id}")
+
         # 2) Modify type
-        client.modify_instance_attribute(
-            InstanceId=instance_id,
-            InstanceType={
-                "Value": get_instance_type(
-                    {
-                        "cloud": x["cloud"],
-                        "instance": {
-                            "cpu": new_cpus_count,
-                        },
-                    }
-                )
-            },
+        new_instance_type = get_instance_type(
+            {
+                "cloud": x["cloud"],
+                "instance": {
+                    "cpu": new_cpus_count,
+                },
+            }
         )
 
-        logger.info(f"modified {instance_id}")
+        client.modify_instance_attribute(
+            InstanceId=instance_id,
+            InstanceType={"Value": new_instance_type},
+        )
+
+        logger.info(f"Modified {instance_id} to {new_instance_type}")
 
         # 3) Start
         client.start_instances(InstanceIds=[instance_id])
         client.get_waiter("instance_running").wait(InstanceIds=[instance_id])
 
-        logger.info(f"restarted {instance_id}")
-
-        # fetch details about the newly created instance
-        # response = ec2.describe_instances(
-        #     InstanceIds=[response["Instances"][0]["InstanceId"]]
-        # )
+        logger.info(f"Restarted {instance_id}")
 
     except Exception as e:
         logger.error(e)
@@ -164,12 +160,12 @@ def modify_gcp_vm(x: dict, new_cpus_count: int):
     try:
         client = InstancesClient()
 
-        logger.info(f"modifying {instance_id=}")
+        logger.info(f"Modifying {instance_id=} {new_cpus_count=}")
 
         # 1) Stop the instance (required to change machine type)
         op = client.stop(project=gcp_project, zone=gcpzone, instance=instance_id)
         wait_for_extended_operation(op)
-        logger.info(f"stopped {instance_id} ...")
+        logger.info(f"Stopped {instance_id}")
 
         # 2) Set the new machine type
         new_instance_type = get_instance_type(
@@ -180,7 +176,7 @@ def modify_gcp_vm(x: dict, new_cpus_count: int):
                 },
             }
         )
-        logger.info(new_instance_type)
+
         req = InstancesSetMachineTypeRequest(
             machine_type=f"zones/{gcpzone}/machineTypes/{new_instance_type}"
         )
@@ -191,12 +187,12 @@ def modify_gcp_vm(x: dict, new_cpus_count: int):
             instances_set_machine_type_request_resource=req,
         )
         wait_for_extended_operation(op)
-        logger.info(f"modified {instance_id}: {new_instance_type}")
+        logger.info(f"Modified {instance_id} to {new_instance_type}")
 
         # 3) Start the instance
         op = client.start(project=gcp_project, zone=gcpzone, instance=instance_id)
         wait_for_extended_operation(op)
-        logger.info(f"restarted {instance_id}")
+        logger.info(f"Restarted {instance_id}")
 
     except Exception as e:
         logger.error(e)
@@ -211,6 +207,10 @@ def modify_azure_vm(
     azure_subscription_id,
     azure_resource_group,
 ):
+    # TODO: implement
+    raise ValueError("NOT IMPLEMENTED")
+    return
+
     logger.debug("++azure %s %s %s" % (cluster_name, group["group_name"], x))
 
     try:
