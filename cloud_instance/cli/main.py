@@ -53,15 +53,15 @@ def gather_current_deployment(
         help="The deployment_id",
     ),
 ):
-    
+
     logger.info(f"START: gather-current-deployment {deployment_id=}")
-    
+
     result = main.gather_current_deployment(deployment_id)
 
     print(json.dumps(result))
-    
+
     logger.info(f"COMPLETED: gather-current-deployment {deployment_id=}")
-    
+
 
 @app.command(help="Return VMs slated to be deleted")
 def return_to_be_deleted_vms(
@@ -76,9 +76,9 @@ def return_to_be_deleted_vms(
         help="deployment",
     ),
 ):
-    
+
     logger.info(f"START: return-to-be-deleted-vms {deployment_id=}")
-    
+
     result = main.return_to_be_deleted_vms(
         deployment_id,
         json.loads(deployment),
@@ -87,6 +87,7 @@ def return_to_be_deleted_vms(
     print(json.dumps(result))
 
     logger.info(f"COMPLETED: return-to-be-deleted-vms {deployment_id=}")
+
 
 @app.command(help="Create the deployment", epilog=EPILOG, no_args_is_help=True)
 def create(
@@ -111,7 +112,7 @@ def create(
         help="Whether to preserve existing VMs.",
     ),
 ):
-    
+
     logger.info(f"START: create {deployment_id=}")
 
     result = main.create(
@@ -122,8 +123,9 @@ def create(
     )
 
     print(json.dumps(result))
-    
+
     logger.info(f"COMPLETED: create {deployment_id=}")
+
 
 @app.command(help="Modify instance type", epilog=EPILOG, no_args_is_help=True)
 def modify_instance_type(
@@ -164,7 +166,7 @@ def modify_instance_type(
 ):
 
     logger.info(f"START: modify-instance-type {deployment_id=}")
-    
+
     main.modify_instance_type(
         deployment_id,
         new_cpus_count,
@@ -173,7 +175,7 @@ def modify_instance_type(
         pause_between,
         json.loads(defaults),
     )
-    
+
     logger.info(f"COMPLETED: modify-instance-type {deployment_id=}")
 
 
@@ -186,12 +188,13 @@ def destroy(
         help="The deployment_id",
     ),
 ):
-    
+
     logger.info(f"START: destroy {deployment_id=}")
-    
+
     main.destroy(deployment_id)
-    
+
     logger.info(f"COMPLETED: destroy {deployment_id=}")
+
 
 def _version_callback(value: bool) -> None:
     if value:

@@ -71,7 +71,7 @@ def modify(
                 modify_gcp_vm(x, new_cpus_count)
             else:
                 modify_azure_vm(x, new_cpus_count)
-                
+
             logger.info(f"Pausing for {pause_between} seconds...")
             time.sleep(pause_between)
     else:
@@ -165,7 +165,7 @@ def modify_gcp_vm(x: dict, new_cpus_count: int):
         client = InstancesClient()
 
         logger.info(f"modifying {instance_id=}")
-        
+
         # 1) Stop the instance (required to change machine type)
         op = client.stop(project=gcp_project, zone=gcpzone, instance=instance_id)
         wait_for_extended_operation(op)
@@ -197,7 +197,6 @@ def modify_gcp_vm(x: dict, new_cpus_count: int):
         op = client.start(project=gcp_project, zone=gcpzone, instance=instance_id)
         wait_for_extended_operation(op)
         logger.info(f"restarted {instance_id}")
-
 
     except Exception as e:
         logger.error(e)
