@@ -82,10 +82,16 @@
         #   --filter-by-groups haproxy \
         #   --defaults '{{ defaults | to_json }}'
 
-        cloud_instance create \
+        # cloud_instance create \
+        #   -d {{ deployment_id }} \
+        #   --deployment '{{ deployment | to_json }}' \
+        #   --defaults '{{ defaults | to_json }}'
+
+        cloud_instance resize \
           -d {{ deployment_id }} \
-          --deployment '{{ deployment | to_json }}' \
-          --defaults '{{ defaults | to_json }}'
+          --disk-size 300 \
+          --pause-between 1 \
+          --filter-by-groups haproxy 
       vars:
         defaults:
           aws:

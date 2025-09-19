@@ -3,7 +3,6 @@
 import json
 import logging
 import platform
-from enum import Enum
 
 import typer
 
@@ -11,7 +10,7 @@ import typer
 from cloud_instance.cli.dep import EPILOG, Param
 
 # import cloud_instance.cli.util
-from cloud_instance.models import main
+from cloud_instance.models import main, resize
 
 from .. import __version__
 
@@ -125,6 +124,53 @@ def create(
     print(json.dumps(result))
 
     logger.info(f"COMPLETED: create {deployment_id=}")
+
+
+@app.command(help="Resize disk", epilog=EPILOG, no_args_is_help=True)
+def resize_disk(
+    deployment_id: str = typer.Option(
+        ...,
+        "-d",
+        "--deployment-id",
+        help="The deployment_id",
+    ),
+    new_disk_size: int = typer.Option(
+        ...,
+        "-s",
+        "--disk-size",
+        help="New CPU count.",
+    ),
+    filter_by_groups: str = typer.Option(
+        None,
+        "-f",
+        "--filter-by-groups",
+        help="comma separated list of groups the instance must belong to",
+    ),
+    sequential: bool = typer.Option(
+        True,
+        "--no-sequential",
+        show_default=False,
+        help="Whether to modify instances sequentially.",
+    ),
+    pause_between: int = typer.Option(
+        30,
+        "-p",
+        "--pause-between",
+        help="If sequential, seconds to pause between modifications.",
+    ),
+):
+
+    logger.info(f"START: resize {deployment_id=}")
+
+    resize.resize(
+        deployment_id,
+        new_disk_size,
+        filter_by_groups.split(",") if filter_by_groups else [],
+        sequential,
+        pause_between,
+    )
+
+    logger.info(f"COMPLETED: resize {deployment_id=}")
 
 
 @app.command(help="Modify instance type", epilog=EPILOG, no_args_is_help=True)
