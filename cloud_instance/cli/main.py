@@ -2,13 +2,8 @@
 
 import json
 import logging
-import os
 import platform
-import sys
 from enum import Enum
-from pathlib import Path
-from typing import Optional
-from urllib.parse import urlparse
 
 import typer
 
@@ -46,17 +41,7 @@ app = typer.Typer(
     help=f"cloud_instance v{__version__}: utility to manage VMs in the cloud.",
 )
 
-
-# app.add_typer(cloud_instance.cli.util.app, name="util")
-
 version: bool = typer.Option(True)
-
-
-class LogLevel(str, Enum):
-    debug = "debug"
-    info = "info"
-    warning = "warning"
-    error = "error"
 
 
 @app.command(help="gather a list of all existing VMs in the specified deployment_id")
@@ -68,10 +53,15 @@ def gather_current_deployment(
         help="The deployment_id",
     ),
 ):
+    
+    logger.info(f"START: gather-current-deployment {deployment_id=}")
+    
     result = main.gather_current_deployment(deployment_id)
 
     print(json.dumps(result))
-
+    
+    logger.info(f"COMPLETED: gather-current-deployment {deployment_id=}")
+    
 
 @app.command(help="Return VMs slated to be deleted")
 def return_to_be_deleted_vms(
@@ -86,6 +76,9 @@ def return_to_be_deleted_vms(
         help="deployment",
     ),
 ):
+    
+    logger.info(f"START: return-to-be-deleted-vms {deployment_id=}")
+    
     result = main.return_to_be_deleted_vms(
         deployment_id,
         json.loads(deployment),
@@ -93,6 +86,7 @@ def return_to_be_deleted_vms(
 
     print(json.dumps(result))
 
+    logger.info(f"COMPLETED: return-to-be-deleted-vms {deployment_id=}")
 
 @app.command(help="Create the deployment", epilog=EPILOG, no_args_is_help=True)
 def create(
@@ -116,11 +110,9 @@ def create(
         show_default=False,
         help="Whether to preserve existing VMs.",
     ),
-    log_level: LogLevel = Param.LogLevel,
 ):
-    # logger.setLevel(log_level.upper())
-
-    logger.debug("Executing run()")
+    
+    logger.info(f"START: create {deployment_id=}")
 
     result = main.create(
         deployment_id,
@@ -130,7 +122,8 @@ def create(
     )
 
     print(json.dumps(result))
-
+    
+    logger.info(f"COMPLETED: create {deployment_id=}")
 
 @app.command(help="Modify instance type", epilog=EPILOG, no_args_is_help=True)
 def modify_instance_type(
@@ -168,10 +161,10 @@ def modify_instance_type(
         ...,
         help="defaults",
     ),
-    log_level: LogLevel = Param.LogLevel,
 ):
-    # logger.setLevel(log_level.upper())
 
+    logger.info(f"START: modify-instance-type {deployment_id=}")
+    
     main.modify_instance_type(
         deployment_id,
         new_cpus_count,
@@ -180,6 +173,8 @@ def modify_instance_type(
         pause_between,
         json.loads(defaults),
     )
+    
+    logger.info(f"COMPLETED: modify-instance-type {deployment_id=}")
 
 
 @app.command(help="Destroy the deployment", epilog=EPILOG, no_args_is_help=True)
@@ -190,10 +185,13 @@ def destroy(
         "--deployment-id",
         help="The deployment_id",
     ),
-    log_level: LogLevel = Param.LogLevel,
 ):
+    
+    logger.info(f"START: destroy {deployment_id=}")
+    
     main.destroy(deployment_id)
-
+    
+    logger.info(f"COMPLETED: destroy {deployment_id=}")
 
 def _version_callback(value: bool) -> None:
     if value:

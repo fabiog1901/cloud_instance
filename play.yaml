@@ -40,14 +40,19 @@
         copies: 1
         inventory_groups:
           - haproxy
-        exact_count: 0
+        exact_count: 1
         instance:
           cpu: 1
         volumes:
           os:
             size: 20
             type: standard_ssd
-          data: []
+          data: 
+            - size: 200
+              type: standard_ssd
+              iops: 500
+              throughput": 300
+              delete_on_termination: yes
         tags:
           Name: fabio1-lb
         project: my-team

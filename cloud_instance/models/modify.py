@@ -71,6 +71,8 @@ def modify(
                 modify_gcp_vm(x, new_cpus_count)
             else:
                 modify_azure_vm(x, new_cpus_count)
+                
+            logger.info(f"Pausing for {pause_between} seconds...")
             time.sleep(pause_between)
     else:
         threads = []
@@ -153,8 +155,6 @@ def modify_gcp_vm(x: dict, new_cpus_count: int):
 
     instance_id = x["id"]
 
-    logger.info(f"modifying {instance_id=}")
-
     gcp_project = os.getenv("GCP_PROJECT")
     if not gcp_project:
         raise ValueError("GCP_PROJECT env var is not defined")
@@ -164,17 +164,12 @@ def modify_gcp_vm(x: dict, new_cpus_count: int):
     try:
         client = InstancesClient()
 
+        logger.info(f"modifying {instance_id=}")
+        
         # 1) Stop the instance (required to change machine type)
         op = client.stop(project=gcp_project, zone=gcpzone, instance=instance_id)
         wait_for_extended_operation(op)
         logger.info(f"stopped {instance_id} ...")
-
-        # # (Optional) verify status is TERMINATED
-        # while True:
-        #     inst = client.get(project=gcp_project, zone=gcpzone, instance=instance_id)
-        #     if inst.status == "TERMINATED":
-        #         break
-        #     time.sleep(3)
 
         # 2) Set the new machine type
         new_instance_type = get_instance_type(
@@ -196,20 +191,13 @@ def modify_gcp_vm(x: dict, new_cpus_count: int):
             instances_set_machine_type_request_resource=req,
         )
         wait_for_extended_operation(op)
-        logger.info(f"modified {instance_id}")
+        logger.info(f"modified {instance_id}: {new_instance_type}")
 
         # 3) Start the instance
         op = client.start(project=gcp_project, zone=gcpzone, instance=instance_id)
         wait_for_extended_operation(op)
         logger.info(f"restarted {instance_id}")
 
-        # # (Optional) wait until RUNNING
-        # while True:
-        #     inst = client.get(project=gcp_project, zone=gcpzone, instance=instance_id)
-        #     if inst.status == "RUNNING":
-        #         print(f"Instance is RUNNING as {inst.machine_type.split('/')[-1]}")
-        #         break
-        #     time.sleep(3)
 
     except Exception as e:
         logger.error(e)
