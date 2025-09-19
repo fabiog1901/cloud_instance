@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cloud-instance"
-version = "0.1.4"
+version = "0.1.5"
 description = ""
 authors = ["Fabio Ghirardello"]
 license = "GPLv3+"
@@ -14,7 +14,7 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-cloud_instance = 'cloud_instance.cli.main:app'
+cloud_instance = 'cloud_instance.cli.cli:app'
 
 [tool.poetry.dependencies]
 python = "^3.11"

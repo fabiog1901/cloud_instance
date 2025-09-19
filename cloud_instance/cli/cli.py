@@ -7,10 +7,10 @@ import platform
 import typer
 
 # import cloud_instance.utils.common
-from cloud_instance.cli.dep import EPILOG, Param
+from cloud_instance.cli.dep import EPILOG
 
 # import cloud_instance.cli.util
-from cloud_instance.models import main, resize
+from cloud_instance.models import create, delete, gather, modify, resize, slated
 
 from .. import __version__
 
@@ -43,8 +43,12 @@ app = typer.Typer(
 version: bool = typer.Option(True)
 
 
-@app.command(help="gather a list of all existing VMs in the specified deployment_id")
-def gather_current_deployment(
+@app.command(
+    name="gather",
+    help="Gather a list of all existing VMs in the specified deployment_id",
+    no_args_is_help=True,
+)
+def cli_gather(
     deployment_id: str = typer.Option(
         ...,
         "-d",
@@ -53,17 +57,21 @@ def gather_current_deployment(
     ),
 ):
 
-    logger.info(f"START: gather-current-deployment {deployment_id=}")
+    logger.info(f"START: gather {deployment_id=}")
 
-    result = main.gather_current_deployment(deployment_id)
+    result = gather.gather(deployment_id)
 
     print(json.dumps(result))
 
-    logger.info(f"COMPLETED: gather-current-deployment {deployment_id=}")
+    logger.info(f"COMPLETED: gather {deployment_id=}")
 
 
-@app.command(help="Return VMs slated to be deleted")
-def return_to_be_deleted_vms(
+@app.command(
+    name="slated",
+    help="Return VMs slated to be deleted",
+    no_args_is_help=True,
+)
+def cli_slated(
     deployment_id: str = typer.Option(
         ...,
         "-d",
@@ -72,24 +80,28 @@ def return_to_be_deleted_vms(
     ),
     deployment: str = typer.Option(
         ...,
-        help="deployment",
+        help="The deployment_id",
     ),
 ):
 
-    logger.info(f"START: return-to-be-deleted-vms {deployment_id=}")
+    logger.info(f"START: slated {deployment_id=}")
 
-    result = main.return_to_be_deleted_vms(
+    result = slated.slated(
         deployment_id,
         json.loads(deployment),
     )
 
     print(json.dumps(result))
 
-    logger.info(f"COMPLETED: return-to-be-deleted-vms {deployment_id=}")
+    logger.info(f"COMPLETED: slated {deployment_id=}")
 
 
-@app.command(help="Create the deployment", epilog=EPILOG, no_args_is_help=True)
-def create(
+@app.command(
+    name="create",
+    help="Create the deployment",
+    no_args_is_help=True,
+)
+def cli_create(
     deployment_id: str = typer.Option(
         ...,
         "-d",
@@ -114,7 +126,7 @@ def create(
 
     logger.info(f"START: create {deployment_id=}")
 
-    result = main.create(
+    result = create.create(
         deployment_id,
         json.loads(deployment),
         json.loads(defaults),
@@ -126,8 +138,12 @@ def create(
     logger.info(f"COMPLETED: create {deployment_id=}")
 
 
-@app.command(help="Resize disk", epilog=EPILOG, no_args_is_help=True)
-def resize_disk(
+@app.command(
+    name="resize",
+    help="Resize disk",
+    no_args_is_help=True,
+)
+def cli_resize(
     deployment_id: str = typer.Option(
         ...,
         "-d",
@@ -173,8 +189,12 @@ def resize_disk(
     logger.info(f"COMPLETED: resize {deployment_id=}")
 
 
-@app.command(help="Modify instance type", epilog=EPILOG, no_args_is_help=True)
-def modify_instance_type(
+@app.command(
+    name="modify",
+    help="Modify instance type",
+    no_args_is_help=True,
+)
+def cli_modify(
     deployment_id: str = typer.Option(
         ...,
         "-d",
@@ -213,7 +233,7 @@ def modify_instance_type(
 
     logger.info(f"START: modify-instance-type {deployment_id=}")
 
-    main.modify_instance_type(
+    modify.modify(
         deployment_id,
         new_cpus_count,
         filter_by_groups.split(",") if filter_by_groups else [],
@@ -225,8 +245,12 @@ def modify_instance_type(
     logger.info(f"COMPLETED: modify-instance-type {deployment_id=}")
 
 
-@app.command(help="Destroy the deployment", epilog=EPILOG, no_args_is_help=True)
-def destroy(
+@app.command(
+    name="delete",
+    help="Destroy the deployment",
+    no_args_is_help=True,
+)
+def cli_delete(
     deployment_id: str = typer.Option(
         ...,
         "-d",
@@ -235,11 +259,11 @@ def destroy(
     ),
 ):
 
-    logger.info(f"START: destroy {deployment_id=}")
+    logger.info(f"START: delete {deployment_id=}")
 
-    main.destroy(deployment_id)
+    delete.delete(deployment_id)
 
-    logger.info(f"COMPLETED: destroy {deployment_id=}")
+    logger.info(f"COMPLETED: delete {deployment_id=}")
 
 
 def _version_callback(value: bool) -> None:

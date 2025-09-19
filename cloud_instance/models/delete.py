@@ -13,20 +13,36 @@ from azure.mgmt.compute import ComputeManagementClient
 from google.cloud.compute_v1 import InstancesClient
 from google.cloud.compute_v1.services.addresses.client import AddressesClient
 
+from ..util.fetch import fetch_all
+
 logger = logging.getLogger("cloud_instance")
 
 errors: list[str] = []
 
 
-def destroy_all(instances: list):
+def delete(deployment_id: str):
+
+    # fetch all running instances for the deployment_id and append them to the 'instances' list
+    logger.info(f"Fetching all instances with deployment_id = '{deployment_id}'")
+    current_instances, _errors = fetch_all(deployment_id)
+
+    logger.info(f"current_instances count={len(current_instances)}")
+    for idx, x in enumerate(current_instances, start=1):
+        logger.info(f"{idx}:\t{x}")
+
+    if _errors:
+        raise ValueError(_errors)
+
+    logger.info("Destroying all instances")
+
     threads: list[Thread] = []
 
-    for x in instances:
+    for x in current_instances:
         thread = Thread(
             target={
-                "aws": destroy_aws_vm,
-                "gcp": destroy_gcp_vm,
-                "azure": destroy_azure_vm,
+                "aws": delete_aws_vm,
+                "gcp": delete_gcp_vm,
+                "azure": delete_azure_vm,
             }.get(x["cloud"]),
             args=(x,),
         )
@@ -47,7 +63,7 @@ def update_errors(error: str):
         errors.append(error)
 
 
-def destroy_aws_vm(instance: dict):
+def delete_aws_vm(instance: dict):
 
     def get_allocation_id(public_ip, instance_id):
         response = ec2.describe_addresses(PublicIps=[public_ip])
@@ -93,7 +109,7 @@ def destroy_aws_vm(instance: dict):
         update_errors(e)
 
 
-def destroy_gcp_vm(instance: dict):
+def delete_gcp_vm(instance: dict):
     logger.debug(f"--gcp {instance['id']}")
 
     gcp_project = os.getenv("GCP_PROJECT")
@@ -125,7 +141,7 @@ def destroy_gcp_vm(instance: dict):
         update_errors(e)
 
 
-def destroy_azure_vm(instance: dict):
+def delete_azure_vm(instance: dict):
     logger.debug(f"--azure {instance['id']}")
 
     azure_subscription_id = os.getenv("AZURE_SUBSCRIPTION_ID")

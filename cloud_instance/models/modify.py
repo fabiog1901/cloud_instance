@@ -16,6 +16,8 @@ from google.api_core.extended_operation import ExtendedOperation
 # GCP
 from google.cloud.compute_v1 import InstancesClient, InstancesSetMachineTypeRequest
 
+from ..util.fetch import fetch_all
+
 logger = logging.getLogger("cloud_instance")
 
 instances: list[dict] = []
@@ -54,17 +56,41 @@ def get_instance_type(group: dict):
 
 
 def modify(
-    vms: list[dict],
+    deployment_id: str,
     new_cpus_count: int,
+    filter_by_groups: list[str] = [],
     sequential: bool = True,
-    pause_between: int = 0,
+    pause_between: int = 30,
     instance_defaults: dict = {},
-):
+) -> None:
+
+    # fetch all running instances for the deployment_id and append them to the 'instances' list
+    logger.info(f"Fetching all instances with deployment_id = '{deployment_id}'")
+    current_instances, _errors = fetch_all(deployment_id)
+
+    logger.info(f"current_instances count={len(current_instances)}")
+    for idx, x in enumerate(current_instances, start=1):
+        logger.info(f"{idx}:\t{x}")
+
+    if _errors:
+        raise ValueError(_errors)
+
+    filtered_instances = []
+
+    for idx, x in enumerate(current_instances, start=1):
+        inv_grps = set(x.get("inventory_groups", []))
+        if (
+            len(filter_by_groups) == 0
+            or inv_grps
+            and set(filter_by_groups).issubset(inv_grps)
+        ):
+            filtered_instances.append(x)
+
     global defaults
     defaults = instance_defaults
 
     if sequential:
-        for x in vms:
+        for x in filtered_instances:
             if x["cloud"] == "aws":
                 modify_aws_vm(x, new_cpus_count)
             elif x["cloud"] == "gcp":
@@ -76,7 +102,7 @@ def modify(
             time.sleep(pause_between)
     else:
         threads = []
-        for x in vms:
+        for x in filtered_instances:
             t = Thread(
                 target={
                     "aws": modify_aws_vm,

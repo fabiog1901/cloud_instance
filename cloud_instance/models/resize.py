@@ -16,7 +16,7 @@ from google.api_core.extended_operation import ExtendedOperation
 # GCP
 from google.cloud.compute_v1 import DisksClient, DisksResizeRequest, InstancesClient
 
-from .fetch import fetch_all
+from ..util.fetch import fetch_all
 
 logger = logging.getLogger("cloud_instance")
 
