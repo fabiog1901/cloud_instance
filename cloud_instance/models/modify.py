@@ -16,24 +16,18 @@ from google.api_core.extended_operation import ExtendedOperation
 # GCP
 from google.cloud.compute_v1 import InstancesClient, InstancesSetMachineTypeRequest
 
-from ..util.fetch import fetch_all
+from ..util.common import wait_for_extended_operation
+from ..util.fetch import fetch
 
 logger = logging.getLogger("cloud_instance")
 
-instances: list[dict] = []
 errors: list[str] = []
 defaults: dict = {}
 
 
-def update_new_deployment(_instances: list):
-    global instances
-    with Lock():
-        logger.debug("Updating pre-existing instances list")
-        instances += _instances
-
-
 def update_errors(error: str):
     global errors
+    logger.error(error)
     with Lock():
         errors.append(error)
 
@@ -64,16 +58,16 @@ def modify(
     instance_defaults: dict = {},
 ) -> None:
 
-    # fetch all running instances for the deployment_id and append them to the 'instances' list
-    logger.info(f"Fetching all instances with deployment_id = '{deployment_id}'")
-    current_instances, _errors = fetch_all(deployment_id)
+    logger.info(f"Fetching all instances with {deployment_id=}")
+
+    try:
+        current_instances = fetch(deployment_id)
+    except:
+        raise ValueError(f"Failed to fetch instances for {deployment_id=}")
 
     logger.info(f"current_instances count={len(current_instances)}")
     for idx, x in enumerate(current_instances, start=1):
         logger.info(f"{idx}:\t{x}")
-
-    if _errors:
-        raise ValueError(_errors)
 
     filtered_instances = []
 
@@ -117,10 +111,10 @@ def modify(
         for x in threads:
             x.join()
 
-    global instances
     global errors
 
-    return instances, errors
+    if errors:
+        raise ValueError(f"Failed to modify instances for {deployment_id=}")
 
 
 def modify_aws_vm(x: dict, new_cpus_count):
@@ -161,25 +155,17 @@ def modify_aws_vm(x: dict, new_cpus_count):
         logger.info(f"Restarted {instance_id}")
 
     except Exception as e:
-        logger.error(e)
         update_errors(e)
 
 
 def modify_gcp_vm(x: dict, new_cpus_count: int):
 
-    def wait_for_extended_operation(operation: ExtendedOperation):
-        result = operation.result(timeout=300)
-
-        if operation.error_code:
-            logger.info(f"GCP Error: {operation.error_code}: {operation.error_message}")
-
-        return result
-
     instance_id = x["id"]
 
     gcp_project = os.getenv("GCP_PROJECT")
     if not gcp_project:
-        raise ValueError("GCP_PROJECT env var is not defined")
+        update_errors("GCP_PROJECT env var is not defined")
+        return
 
     gcpzone = f"{x['region']}-{x['zone']}"
 
@@ -221,7 +207,6 @@ def modify_gcp_vm(x: dict, new_cpus_count: int):
         logger.info(f"Restarted {instance_id}")
 
     except Exception as e:
-        logger.error(e)
         update_errors(e)
 
 

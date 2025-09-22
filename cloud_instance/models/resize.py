@@ -16,7 +16,8 @@ from google.api_core.extended_operation import ExtendedOperation
 # GCP
 from google.cloud.compute_v1 import DisksClient, DisksResizeRequest, InstancesClient
 
-from ..util.fetch import fetch_all
+from ..util.common import wait_for_extended_operation
+from ..util.fetch import fetch
 
 logger = logging.getLogger("cloud_instance")
 
@@ -25,6 +26,7 @@ errors: list[str] = []
 
 def update_errors(error: str):
     global errors
+    logger.error(error)
     with Lock():
         errors.append(error)
 
@@ -37,16 +39,16 @@ def resize(
     pause_between: int = 30,
 ) -> None:
 
-    # fetch all running instances for the deployment_id and append them to the 'instances' list
-    logger.info(f"Fetching all instances with deployment_id = '{deployment_id}'")
-    current_instances, _errors = fetch_all(deployment_id)
+    logger.info(f"Fetching all instances with {deployment_id=}")
+
+    try:
+        current_instances = fetch(deployment_id)
+    except:
+        raise ValueError(f"Failed to fetch instances for {deployment_id=}")
 
     logger.info(f"current_instances count={len(current_instances)}")
     for idx, x in enumerate(current_instances, start=1):
         logger.info(f"{idx}:\t{x}")
-
-    if _errors:
-        raise ValueError(_errors)
 
     filtered_instances = []
 
@@ -89,66 +91,77 @@ def resize(
 
     global errors
 
-    return errors
+    if errors:
+        raise ValueError(f"Failed to resize instances for {deployment_id=}")
 
 
 def resize_aws_vm(x: dict, new_disk_size):
     instance_id = x["id"]
 
-    try:
-        client = boto3.client("ec2", region_name=x["region"])
+    client = boto3.client("ec2", region_name=x["region"])
 
+    def get_volume_id(instance_id: str) -> str:
+        resp = client.describe_instances(InstanceIds=[instance_id])
+        reservations = resp.get("Reservations", [])
+        for r in reservations:
+            for inst in r.get("Instances", []):
+                for mapping in inst.get("BlockDeviceMappings", []):
+                    return mapping["Ebs"]["VolumeId"]
+
+    def wait_for_resize(volume_id: str, timeout_s: int = 900):
+        """
+        Poll describe_volumes_modifications until the state is 'optimizing' or 'completed'.
+        (Either state is OK to proceed with filesystem growth in most cases.)
+        """
+        start = time.time()
+        while True:
+            mods = client.describe_volumes_modifications(VolumeIds=[volume_id]).get(
+                "VolumesModifications", []
+            )
+            state = mods[0]["ModificationState"] if mods else "unknown"
+            if state in ("optimizing", "completed"):
+                return state
+            if time.time() - start > timeout_s:
+                raise ValueError(
+                    f"Timed out waiting for {volume_id} to resize (last state: {state})"
+                )
+
+            time.sleep(5)
+
+    try:
         logger.info(f"Resize {instance_id=} {new_disk_size=}")
 
-        # # 1) Stop (required to change type)
-        # client.stop_instances(InstanceIds=[instance_id])
-        # client.get_waiter("instance_stopped").wait(InstanceIds=[instance_id])
+        vol_id = get_volume_id(instance_id)
+        vol = boto3.client("ec2", region_name=x["region"]).describe_volumes(
+            VolumeIds=[vol_id]
+        )["Volumes"][0]
+        current_size = vol["Size"]
 
-        # logger.info(f"Stopped {instance_id}")
+        if new_disk_size <= current_size:
+            update_errors(
+                f"Volume {vol_id} is already {current_size} GiB (>= {new_disk_size}). Nothing to do."
+            )
+            return
 
-        # # 2) Modify type
-        # new_instance_type = get_instance_type(
-        #     {
-        #         "cloud": x["cloud"],
-        #         "instance": {
-        #             "cpu": new_cpus_count,
-        #         },
-        #     }
-        # )
+        logger.info(f"Resizing {vol_id} from {current_size} -> {new_disk_size} GiB ...")
+        client.modify_volume(VolumeId=vol_id, Size=new_disk_size)
 
-        # client.modify_instance_attribute(
-        #     InstanceId=instance_id,
-        #     InstanceType={"Value": new_instance_type},
-        # )
+        wait_for_resize(vol_id)
 
-        # logger.info(f"Modified {instance_id} to {new_instance_type}")
-
-        # # 3) Start
-        # client.start_instances(InstanceIds=[instance_id])
-        # client.get_waiter("instance_running").wait(InstanceIds=[instance_id])
-
-        logger.info(f"Restarted {instance_id}")
+        logger.info(f"Resize complete for volume {vol_id}.")
 
     except Exception as e:
-        logger.error(e)
         update_errors(e)
 
 
 def resize_gcp_vm(x: dict, new_disk_size: int):
 
-    def wait_for_extended_operation(op: ExtendedOperation):
-        result = op.result(timeout=300)
-
-        if op.error_code:
-            logger.error(f"GCP Error: {op.error_code}: {op.error_message}")
-
-        return result
-
     instance_id = x["id"]
 
     gcp_project = os.getenv("GCP_PROJECT")
     if not gcp_project:
-        raise ValueError("GCP_PROJECT env var is not defined")
+        update_errors("GCP_PROJECT env var is not defined")
+        return
 
     gcpzone = f"{x['region']}-{x['zone']}"
 
@@ -182,7 +195,6 @@ def resize_gcp_vm(x: dict, new_disk_size: int):
                 logger.info(f"Resized {instance_id}")
 
     except Exception as e:
-        logger.error(e)
         update_errors(e)
 
 

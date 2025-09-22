@@ -21,7 +21,7 @@ instances: list[dict] = []
 errors: list[str] = []
 
 
-def fetch_all(deployment_id: str):
+def fetch(deployment_id: str):
     threads: list[Thread] = []
     global instances
     global errors
@@ -54,7 +54,10 @@ def fetch_all(deployment_id: str):
     # sort instances to ensure list is deterministic
     instances = sorted(instances, key=lambda d: d["id"])
 
-    return instances, errors
+    if errors:
+        raise ValueError(f"Failed to fetch resources for {deployment_id=}")
+
+    return instances
 
 
 def update_instances_list(_instances: list):
@@ -66,6 +69,7 @@ def update_instances_list(_instances: list):
 
 def update_errors(error: str):
     global errors
+    logger.error(error)
     with Lock():
         errors.append(error)
 
@@ -116,53 +120,42 @@ def fetch_aws_instances(deployment_id: str):
 
     except Exception as e:
         update_errors(e)
-        # update_errors(
-        #     {
-        #         "method": "fetch_aws_instances",
-        #         "error_type": str(type(e)),
-        #         "msg": str(e.args),
-        #     }
-        # )
 
 
 def fetch_gcp_instances(deployment_id: str):
-    """
-    Return a dictionary of all instances present in a project, grouped by their zone.
-
-    Args:
-        project_id: project ID or project number of the Cloud project you want to use.
-    Returns:
-        A dictionary with zone names as keys (in form of "zones/{zone_name}") and
-        iterable collections of Instance objects as values.
-    """
     logger.debug(f"Fetching GCP instances for deployment_id = '{deployment_id}'")
 
-    project_id = os.getenv("GCP_PROJECT")
-    if not project_id:
-        logger.warning("Env var GCP_PROJECT is not set")
+    gcp_project = os.getenv("GCP_PROJECT")
+    if not gcp_project:
+        update_errors("Env var GCP_PROJECT is not set")
         return
 
-    instance_client = InstancesClient()
-    # Use the `max_results` parameter to limit the number of results that the API returns per response page.
-    request = AggregatedListInstancesRequest(
-        project=project_id,
-        max_results=5,
-        filter=f"labels.deployment_id:{deployment_id}",
-    )
+    try:
+        instance_client = InstancesClient()
+        # Use the `max_results` parameter to limit the number of results that the API returns per response page.
+        request = AggregatedListInstancesRequest(
+            project=gcp_project,
+            max_results=5,
+            filter=f"labels.deployment_id:{deployment_id}",
+        )
 
-    agg_list = instance_client.aggregated_list(request=request)
-    instances = []
+        agg_list = instance_client.aggregated_list(request=request)
+        instances = []
 
-    # Despite using the `max_results` parameter, you don't need to handle the pagination
-    # your The returned `AggregatedListPager` object handles pagination
-    # automatically, returning separated pages as you iterate over the results.
-    for zone, response in agg_list:
-        if response.instances:
-            for x in response.instances:
-                if x.status in ("PROVISIONING", "STAGING", "RUNNING"):
-                    instances.append(parse_gcp_query(x, zone[6:-2], zone[-1]))
-    if instances:
-        update_instances_list(instances)
+        # Despite using the `max_results` parameter, you don't need to handle the pagination
+        # your The returned `AggregatedListPager` object handles pagination
+        # automatically, returning separated pages as you iterate over the results.
+        for zone, response in agg_list:
+            if response.instances:
+                for x in response.instances:
+                    if x.status in ("PROVISIONING", "STAGING", "RUNNING"):
+                        instances.append(parse_gcp_query(x, zone[6:-2], zone[-1]))
+
+        if instances:
+            update_instances_list(instances)
+
+    except Exception as e:
+        update_errors(e)
 
 
 """

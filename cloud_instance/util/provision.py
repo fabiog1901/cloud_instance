@@ -28,6 +28,7 @@ from google.cloud.compute_v1.services.addresses.client import AddressesClient
 from google.cloud.compute_v1.services.global_addresses import GlobalAddressesClient
 from google.cloud.compute_v1.types import Address, Items, Metadata
 
+from .common import wait_for_extended_operation
 from .parse import parse_aws_query, parse_azure_query, parse_gcp_query
 
 logger = logging.getLogger("cloud_instance")
@@ -46,6 +47,7 @@ def update_new_deployment(_instances: list):
 
 def update_errors(error: str):
     global errors
+    logger.error(error)
     with Lock():
         errors.append(error)
 
@@ -67,16 +69,7 @@ def get_instance_type(group: dict):
     return defaults[cloud][cpu][mem]
 
 
-def wait_for_extended_operation(operation: ExtendedOperation):
-    result = operation.result(timeout=300)
-
-    if operation.error_code:
-        logger.debug(f"GCP Error: {operation.error_code}: {operation.error_message}")
-
-    return result
-
-
-def provision(new_vms: list[Thread], instance_defaults):
+def provision(new_vms: list[Thread], instance_defaults) -> list[dict]:
     global defaults
     defaults = instance_defaults
 
@@ -89,7 +82,7 @@ def provision(new_vms: list[Thread], instance_defaults):
     global instances
     global errors
 
-    return instances, errors
+    return instances
 
 
 def provision_aws_vm(deployment_id: str, cluster_name: str, group: dict, x: int):

@@ -8,7 +8,7 @@ logger = logging.getLogger("cloud_instance")
 current_instances: list[dict] = []
 
 
-def build_deployment(
+def build(
     deployment_id: str,
     deployment: list[dict],
     _current_instances: list[dict],
@@ -70,7 +70,7 @@ def build_group(
     group: dict,
     deployment_id,
 ):
-    # 5. for each group, compare what is in 'deployment' to what is in 'current_deployment':
+    # for each group, compare what is in 'deployment' to what is in 'current_deployment':
     #     case NO DIFFERENCE
     #       return the details in current_deployment
     #

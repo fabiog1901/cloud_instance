@@ -4,8 +4,8 @@ import logging
 logger = logging.getLogger("cloud_instance")
 
 
-from ..util.build import build_deployment
-from ..util.fetch import fetch_all
+from ..util.build import build
+from ..util.fetch import fetch
 from ..util.provision import provision
 from .delete import delete
 
@@ -17,19 +17,20 @@ def create(
     preserve: bool,
 ) -> list[dict]:
 
-    # fetch all running instances for the deployment_id and append them to the 'instances' list
-    logger.info(f"Fetching all instances with deployment_id = '{deployment_id}'")
-    current_instances, errors = fetch_all(deployment_id)
+    logger.info(f"Fetching all instances with {deployment_id=}")
+
+    try:
+        current_instances = fetch(deployment_id)
+    except:
+        raise ValueError(f"Failed to fetch instances for {deployment_id=}")
 
     logger.info(f"current_instances count={len(current_instances)}")
     for idx, x in enumerate(current_instances, start=1):
         logger.info(f"{idx}:\t{x}")
 
-    if errors:
-        raise ValueError(errors)
-
     logger.info("Building deployment...")
-    current_vms, surplus_vms, new_vms = build_deployment(
+
+    current_vms, surplus_vms, new_vms = build(
         deployment_id,
         deployment,
         current_instances,
@@ -48,18 +49,23 @@ def create(
         logger.info(f"{idx}:\t{x}")
 
     logger.info("Provisioning new_vms...")
-    new_instances, errors = provision(new_vms, defaults)
+
+    try:
+        new_instances = provision(new_vms, defaults)
+    except Exception as e:
+        raise ValueError(f"Failed to provision for {deployment_id=}.")
 
     if not preserve:
-        logger.info("Destroying surplus_vms...")
-        delete(surplus_vms)
+        logger.info("Deleting surplus_vms...")
+        try:
+            delete(surplus_vms)
+        except:
+            raise ValueError(f"Failed to delete surplus_vms for {deployment_id=}.")
 
     logger.info(f"new deployment count={len(new_instances + current_vms)}")
     for idx, x in enumerate(new_instances + current_vms, start=1):
         logger.info(f"{idx}:\t{x}")
 
-    if errors:
-        raise ValueError(errors)
-
     logger.info("Returning new deployment list to client")
+
     return new_instances + current_vms

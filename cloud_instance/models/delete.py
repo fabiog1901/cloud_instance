@@ -13,27 +13,25 @@ from azure.mgmt.compute import ComputeManagementClient
 from google.cloud.compute_v1 import InstancesClient
 from google.cloud.compute_v1.services.addresses.client import AddressesClient
 
-from ..util.fetch import fetch_all
+from ..util.fetch import fetch
 
 logger = logging.getLogger("cloud_instance")
 
 errors: list[str] = []
 
 
-def delete(deployment_id: str):
+def delete(deployment_id: str) -> None:
 
-    # fetch all running instances for the deployment_id and append them to the 'instances' list
-    logger.info(f"Fetching all instances with deployment_id = '{deployment_id}'")
-    current_instances, _errors = fetch_all(deployment_id)
+    try:
+        current_instances = fetch(deployment_id)
+    except:
+        raise ValueError(f"Failed to fetch instances for {deployment_id=}")
 
     logger.info(f"current_instances count={len(current_instances)}")
     for idx, x in enumerate(current_instances, start=1):
         logger.info(f"{idx}:\t{x}")
 
-    if _errors:
-        raise ValueError(_errors)
-
-    logger.info("Destroying all instances")
+    logger.info("Deleting all instances")
 
     threads: list[Thread] = []
 
@@ -54,7 +52,9 @@ def delete(deployment_id: str):
         x.join()
 
     global errors
-    return errors
+
+    if errors:
+        raise ValueError(f"Failed to delete instances of {deployment_id=}")
 
 
 def update_errors(error: str):
@@ -78,9 +78,9 @@ def delete_aws_vm(instance: dict):
                 )
                 return allocation_id
 
-        update_errors(f"No Elastic IP found associated with instance {instance_id}")
+        raise ValueError(f"No Elastic IP found associated with instance {instance_id}")
 
-    logger.debug(f"--aws {instance['id']}")
+    logger.info(f"--aws {instance['id']}")
 
     try:
         ec2 = boto3.client("ec2", region_name=instance["region"])
@@ -97,7 +97,7 @@ def delete_aws_vm(instance: dict):
         status = response["TerminatingInstances"][0]["CurrentState"]["Name"]
 
         if status in ["shutting-down", "terminated"]:
-            logger.debug(f"Deleted AWS instance: {instance}")
+            logger.info(f"Deleted AWS instance: {instance['id']}")
         else:
             logger.error(f"Unexpected response: {response}")
             update_errors(str(response))

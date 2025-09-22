@@ -3,6 +3,7 @@
 import json
 import logging
 import platform
+import sys
 
 import typer
 
@@ -44,59 +45,6 @@ version: bool = typer.Option(True)
 
 
 @app.command(
-    name="gather",
-    help="Gather a list of all existing VMs in the specified deployment_id",
-    no_args_is_help=True,
-)
-def cli_gather(
-    deployment_id: str = typer.Option(
-        ...,
-        "-d",
-        "--deployment-id",
-        help="The deployment_id",
-    ),
-):
-
-    logger.info(f"START: gather {deployment_id=}")
-
-    result = gather.gather(deployment_id)
-
-    print(json.dumps(result))
-
-    logger.info(f"COMPLETED: gather {deployment_id=}")
-
-
-@app.command(
-    name="slated",
-    help="Return VMs slated to be deleted",
-    no_args_is_help=True,
-)
-def cli_slated(
-    deployment_id: str = typer.Option(
-        ...,
-        "-d",
-        "--deployment-id",
-        help="The deployment_id",
-    ),
-    deployment: str = typer.Option(
-        ...,
-        help="The deployment_id",
-    ),
-):
-
-    logger.info(f"START: slated {deployment_id=}")
-
-    result = slated.slated(
-        deployment_id,
-        json.loads(deployment),
-    )
-
-    print(json.dumps(result))
-
-    logger.info(f"COMPLETED: slated {deployment_id=}")
-
-
-@app.command(
     name="create",
     help="Create the deployment",
     no_args_is_help=True,
@@ -126,12 +74,16 @@ def cli_create(
 
     logger.info(f"START: create {deployment_id=}")
 
-    result = create.create(
-        deployment_id,
-        json.loads(deployment),
-        json.loads(defaults),
-        preserve,
-    )
+    try:
+        result = create.create(
+            deployment_id,
+            json.loads(deployment),
+            json.loads(defaults),
+            preserve,
+        )
+    except Exception as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
 
     print(json.dumps(result))
 
@@ -139,54 +91,64 @@ def cli_create(
 
 
 @app.command(
-    name="resize",
-    help="Resize disk",
+    name="gather",
+    help="Gather a list of all existing VMs in the specified deployment_id",
     no_args_is_help=True,
 )
-def cli_resize(
+def cli_gather(
     deployment_id: str = typer.Option(
         ...,
         "-d",
         "--deployment-id",
         help="The deployment_id",
     ),
-    new_disk_size: int = typer.Option(
+):
+
+    logger.info(f"START: gather {deployment_id=}")
+
+    try:
+        result = gather.gather(deployment_id)
+    except Exception as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
+
+    print(json.dumps(result))
+
+    logger.info(f"COMPLETED: gather {deployment_id=}")
+
+
+@app.command(
+    name="slated",
+    help="Return VMs slated to be deleted",
+    no_args_is_help=True,
+)
+def cli_slated(
+    deployment_id: str = typer.Option(
         ...,
-        "-s",
-        "--disk-size",
-        help="New CPU count.",
+        "-d",
+        "--deployment-id",
+        help="The deployment_id",
     ),
-    filter_by_groups: str = typer.Option(
-        None,
-        "-f",
-        "--filter-by-groups",
-        help="comma separated list of groups the instance must belong to",
-    ),
-    sequential: bool = typer.Option(
-        True,
-        "--no-sequential",
-        show_default=False,
-        help="Whether to modify instances sequentially.",
-    ),
-    pause_between: int = typer.Option(
-        30,
-        "-p",
-        "--pause-between",
-        help="If sequential, seconds to pause between modifications.",
+    deployment: str = typer.Option(
+        ...,
+        help="The deployment_id",
     ),
 ):
 
-    logger.info(f"START: resize {deployment_id=}")
+    logger.info(f"START: slated {deployment_id=}")
 
-    resize.resize(
-        deployment_id,
-        new_disk_size,
-        filter_by_groups.split(",") if filter_by_groups else [],
-        sequential,
-        pause_between,
-    )
+    try:
+        result = slated.slated(
+            deployment_id,
+            json.loads(deployment),
+        )
+    except Exception as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
 
-    logger.info(f"COMPLETED: resize {deployment_id=}")
+    print(json.dumps(result))
+
+    logger.info(f"COMPLETED: slated {deployment_id=}")
 
 
 @app.command(
@@ -243,6 +205,57 @@ def cli_modify(
     )
 
     logger.info(f"COMPLETED: modify-instance-type {deployment_id=}")
+
+
+@app.command(
+    name="resize",
+    help="Resize disk",
+    no_args_is_help=True,
+)
+def cli_resize(
+    deployment_id: str = typer.Option(
+        ...,
+        "-d",
+        "--deployment-id",
+        help="The deployment_id",
+    ),
+    new_disk_size: int = typer.Option(
+        ...,
+        "-s",
+        "--disk-size",
+        help="New CPU count.",
+    ),
+    filter_by_groups: str = typer.Option(
+        None,
+        "-f",
+        "--filter-by-groups",
+        help="comma separated list of groups the instance must belong to",
+    ),
+    sequential: bool = typer.Option(
+        True,
+        "--no-sequential",
+        show_default=False,
+        help="Whether to modify instances sequentially.",
+    ),
+    pause_between: int = typer.Option(
+        30,
+        "-p",
+        "--pause-between",
+        help="If sequential, seconds to pause between modifications.",
+    ),
+):
+
+    logger.info(f"START: resize {deployment_id=}")
+
+    resize.resize(
+        deployment_id,
+        new_disk_size,
+        filter_by_groups.split(",") if filter_by_groups else [],
+        sequential,
+        pause_between,
+    )
+
+    logger.info(f"COMPLETED: resize {deployment_id=}")
 
 
 @app.command(

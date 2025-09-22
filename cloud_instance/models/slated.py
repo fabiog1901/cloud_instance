@@ -4,8 +4,8 @@ import logging
 logger = logging.getLogger("cloud_instance")
 
 
-from ..util.build import build_deployment
-from ..util.fetch import fetch_all
+from ..util.build import build
+from ..util.fetch import fetch
 
 
 def slated(
@@ -13,19 +13,19 @@ def slated(
     deployment: list,
 ) -> list[dict]:
 
-    # fetch all running instances for the deployment_id and append them to the 'instances' list
-    logger.info(f"Fetching all instances with deployment_id = '{deployment_id}'")
-    current_instances, errors = fetch_all(deployment_id)
+    logger.info(f"Fetching all instances with {deployment_id=}")
+
+    try:
+        current_instances = fetch(deployment_id)
+    except:
+        raise ValueError(f"Failed to fetch instances for {deployment_id=}")
 
     logger.info(f"current_instances count={len(current_instances)}")
     for idx, x in enumerate(current_instances, start=1):
         logger.info(f"{idx}:\t{x}")
 
-    if errors:
-        raise ValueError(errors)
-
     logger.info("Building deployment...")
-    current_vms, surplus_vms, new_vms = build_deployment(
+    current_vms, surplus_vms, new_vms = build(
         deployment_id,
         deployment,
         current_instances,
