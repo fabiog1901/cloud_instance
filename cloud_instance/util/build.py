@@ -89,7 +89,7 @@ def build_group(
 
     global current_instances
 
-    for x in current_instances:
+    for x in current_instances.copy():
         if (
             x["cluster_name"] == cluster_name
             and x["group_name"] == group["group_name"]
