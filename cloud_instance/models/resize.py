@@ -106,7 +106,8 @@ def resize_aws_vm(x: dict, new_disk_size):
         for r in reservations:
             for inst in r.get("Instances", []):
                 for mapping in inst.get("BlockDeviceMappings", []):
-                    return mapping["Ebs"]["VolumeId"]
+                    if mapping["DeviceName"] != "/dev/sda1":
+                        return mapping["Ebs"]["VolumeId"]
 
     def wait_for_resize(volume_id: str, timeout_s: int = 900):
         """

@@ -82,6 +82,9 @@ def provision(new_vms: list[Thread], instance_defaults) -> list[dict]:
     global instances
     global errors
 
+    if errors:
+        raise ValueError("Failed to provision instances.")
+
     return instances
 
 
@@ -205,7 +208,6 @@ def provision_aws_vm(deployment_id: str, cluster_name: str, group: dict, x: int)
         # add the instance to the list
         update_new_deployment(parse_aws_query(response))
     except Exception as e:
-        logger.error(e)
         update_errors(e)
 
 
@@ -380,7 +382,6 @@ def provision_gcp_vm(deployment_id: str, cluster_name: str, group: dict, x: int)
         )
 
     except Exception as e:
-        logger.error(e)
         update_errors(e)
 
 
@@ -549,5 +550,4 @@ def provision_azure_vm(
         # )
 
     except Exception as e:
-        logger.error(e)
         update_errors(e)
