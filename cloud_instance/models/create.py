@@ -7,7 +7,7 @@ logger = logging.getLogger("cloud_instance")
 from ..util.build import build
 from ..util.fetch import fetch
 from ..util.provision import provision
-from .delete import delete
+from ..util.terminate import terminate
 
 
 def create(
@@ -58,7 +58,7 @@ def create(
     if not preserve:
         logger.info("Deleting surplus_vms...")
         try:
-            delete(surplus_vms)
+            terminate(surplus_vms)
         except:
             raise ValueError(f"Failed to delete surplus_vms for {deployment_id=}.")
 

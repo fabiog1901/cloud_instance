@@ -43,5 +43,5 @@ def slated(
     for idx, x in enumerate(new_vms, start=1):
         logger.info(f"{idx}:\t{x}")
 
-    logger.info("Returning to be deleted VMs")
+    logger.info("Returning instances slated for deletion.")
     return surplus_vms
