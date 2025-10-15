@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 import json
 import logging
 import platform
@@ -8,10 +6,15 @@ import sys
 import typer
 
 # import cloud_instance.utils.common
-from cloud_instance.cli.dep import EPILOG
+from ..cli.dep import EPILOG
 
 # import cloud_instance.cli.util
-from cloud_instance.models import create, delete, gather, modify, resize, slated
+from ..models.create import create
+from ..models.delete import delete
+from ..models.gather import gather
+from ..models.modify import modify
+from ..models.resize import resize
+from ..models.slated import slated
 
 from .. import __version__
 
@@ -75,7 +78,7 @@ def cli_create(
     logger.info(f"START: create {deployment_id=}")
 
     try:
-        result = create.create(
+        result = create(
             deployment_id,
             json.loads(deployment),
             json.loads(defaults),
@@ -107,7 +110,7 @@ def cli_gather(
     logger.info(f"START: gather {deployment_id=}")
 
     try:
-        result = gather.gather(deployment_id)
+        result = gather(deployment_id)
     except Exception as e:
         print(e, file=sys.stderr)
         sys.exit(1)
@@ -138,7 +141,7 @@ def cli_slated(
     logger.info(f"START: slated {deployment_id=}")
 
     try:
-        result = slated.slated(
+        result = slated(
             deployment_id,
             json.loads(deployment),
         )
@@ -193,9 +196,9 @@ def cli_modify(
     ),
 ):
 
-    logger.info(f"START: modify-instance-type {deployment_id=}")
+    logger.info(f"START: modify {deployment_id=}")
 
-    modify.modify(
+    modify(
         deployment_id,
         new_cpus_count,
         filter_by_groups.split(",") if filter_by_groups else [],
@@ -204,7 +207,7 @@ def cli_modify(
         json.loads(defaults),
     )
 
-    logger.info(f"COMPLETED: modify-instance-type {deployment_id=}")
+    logger.info(f"COMPLETED: modify {deployment_id=}")
 
 
 @app.command(
@@ -247,7 +250,7 @@ def cli_resize(
 
     logger.info(f"START: resize {deployment_id=}")
 
-    resize.resize(
+    resize(
         deployment_id,
         new_disk_size,
         filter_by_groups.split(",") if filter_by_groups else [],
@@ -274,7 +277,7 @@ def cli_delete(
 
     logger.info(f"START: delete {deployment_id=}")
 
-    delete.delete(deployment_id)
+    delete(deployment_id)
 
     logger.info(f"COMPLETED: delete {deployment_id=}")
 
