@@ -4,6 +4,8 @@ from threading import Lock, Thread
 
 # AWS
 import boto3
+from botocore.config import Config
+from botocore.exceptions import ConnectTimeoutError, ReadTimeoutError
 
 # AZURE
 from azure.identity import EnvironmentCredential
@@ -83,7 +85,15 @@ def fetch_aws_instances(deployment_id: str):
         logger.debug(f"Fetching AWS instances from {region}")
 
         try:
-            ec2 = boto3.client("ec2", region_name=region)
+            ec2 = boto3.client(
+                "ec2",
+                region_name=region,
+                config=Config(
+                    connect_timeout=5,
+                    read_timeout=5,
+                    retries={'max_attempts': 0}
+                ),
+            )
             response = ec2.describe_instances(
                 Filters=[
                     {
@@ -96,11 +106,15 @@ def fetch_aws_instances(deployment_id: str):
 
             aws_instances: list = parse_aws_query(response)
 
+            if aws_instances:
+                update_instances_list(aws_instances)
+
+        except ConnectTimeoutError:
+            logger.warning("EC2 connection timed out")
+        except ReadTimeoutError:
+            logger.warning("EC2 response timed out")
         except Exception as e:
             update_errors(e)
-
-        if aws_instances:
-            update_instances_list(aws_instances)
 
     try:
         ec2 = boto3.client("ec2", region_name="us-east-1")
