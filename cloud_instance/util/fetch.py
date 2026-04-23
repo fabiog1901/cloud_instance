@@ -5,7 +5,7 @@ from threading import Lock, Thread
 # AWS
 import boto3
 from botocore.config import Config
-from botocore.exceptions import ConnectTimeoutError, ReadTimeoutError
+from botocore.exceptions import ConnectTimeoutError, ReadTimeoutError, SSLError
 
 # AZURE
 from azure.identity import EnvironmentCredential
@@ -113,6 +113,11 @@ def fetch_aws_instances(deployment_id: str):
             logger.warning("EC2 connection timed out")
         except ReadTimeoutError:
             logger.warning("EC2 response timed out")
+        except SSLError as e:
+            if "SSL validation failed" in str(e) and "UNEXPECTED_EOF_WHILE_READING" in str(e):
+                logger.warning("EC2 SSL validation failed due to unexpected EOF")
+            else:
+                update_errors(e)
         except Exception as e:
             update_errors(e)
 

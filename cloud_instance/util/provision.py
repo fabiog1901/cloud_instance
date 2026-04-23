@@ -28,6 +28,7 @@ from google.cloud.compute_v1.services.addresses.client import AddressesClient
 from google.cloud.compute_v1.services.global_addresses import GlobalAddressesClient
 from google.cloud.compute_v1.types import Address, Items, Metadata
 
+from ..models.ip_address import IPAddressType
 from .common import wait_for_extended_operation
 from .parse import parse_aws_query, parse_azure_query, parse_gcp_query
 
@@ -88,7 +89,13 @@ def provision(new_vms: list[Thread], instance_defaults) -> list[dict]:
     return instances
 
 
-def provision_aws_vm(deployment_id: str, cluster_name: str, group: dict, x: int):
+def provision_aws_vm(
+    deployment_id: str,
+    cluster_name: str,
+    group: dict,
+    x: int,
+    ip_address_type: IPAddressType = IPAddressType.IPv4_EPHEMERAL,
+):
     logger.debug("++aws %s %s %s" % (cluster_name, group["region"], x))
 
     # volumes
@@ -194,11 +201,12 @@ def provision_aws_vm(deployment_id: str, cluster_name: str, group: dict, x: int)
         waiter = ec2.get_waiter("instance_running")
         waiter.wait(InstanceIds=[response["Instances"][0]["InstanceId"]])
 
-        allocation = ec2.allocate_address(Domain="vpc")
-        resp = ec2.associate_address(
-            AllocationId=allocation["AllocationId"],
-            InstanceId=response["Instances"][0]["InstanceId"],
-        )
+        if ip_address_type == IPAddressType.IPv4_RESERVED:
+            allocation = ec2.allocate_address(Domain="vpc")
+            resp = ec2.associate_address(
+                AllocationId=allocation["AllocationId"],
+                InstanceId=response["Instances"][0]["InstanceId"],
+            )
 
         # fetch details about the newly created instance
         response = ec2.describe_instances(
@@ -211,41 +219,49 @@ def provision_aws_vm(deployment_id: str, cluster_name: str, group: dict, x: int)
         update_errors(e)
 
 
-def provision_gcp_vm(deployment_id: str, cluster_name: str, group: dict, x: int):
+def provision_gcp_vm(
+    deployment_id: str,
+    cluster_name: str,
+    group: dict,
+    x: int,
+    ip_address_type: IPAddressType = IPAddressType.IPv4_EPHEMERAL,
+):
     logger.info("++gcp %s %s %s" % (cluster_name, group["group_name"], x))
 
-    gcp_project = os.getenv("GCP_PROJECT")
-    if not gcp_project:
-        raise ValueError("GCP_PROJECT env var is not defined")
-
-    gcpzone = "-".join([group["region"], group["zone"]])
-
-    instance_name = deployment_id + "-" + str(random.randint(0, 1e16)).zfill(16)
-
-    instance_client = InstancesClient()
-    addresses_client = AddressesClient()
-
     try:
-        op = addresses_client.insert(
-            project=gcp_project,
-            region=group["region"],
-            address_resource=Address(
-                name=f"{instance_name}-eip",
-            ),
-        )
-        wait_for_extended_operation(op)
+        gcp_project = os.getenv("GCP_PROJECT")
+        if not gcp_project:
+            raise ValueError("GCP_PROJECT env var is not defined")
 
-        # Get the reserved IP address
-        reserved = addresses_client.get(
-            project=gcp_project,
-            region=group["region"],
-            address=f"{instance_name}-eip",
-        )
-        reserved_ip = reserved.address
+        gcpzone = "-".join([group["region"], group["zone"]])
 
-        logger.info(
-            f"GCP External IP address reserved successfully: {instance_name}-eip"
-        )
+        instance_name = deployment_id + "-" + str(random.randint(0, 1e16)).zfill(16)
+
+        instance_client = InstancesClient()
+
+        if ip_address_type == IPAddressType.IPv4_RESERVED:
+            addresses_client = AddressesClient()
+
+            op = addresses_client.insert(
+                project=gcp_project,
+                region=group["region"],
+                address_resource=Address(
+                    name=f"{instance_name}-eip",
+                ),
+            )
+            wait_for_extended_operation(op)
+
+            # Get the reserved IP address
+            reserved = addresses_client.get(
+                project=gcp_project,
+                region=group["region"],
+                address=f"{instance_name}-eip",
+            )
+            reserved_ip = reserved.address
+
+            logger.info(
+                f"GCP External IP address reserved successfully: {instance_name}-eip"
+            )
 
         # volumes
         def get_type(x):
@@ -344,7 +360,10 @@ def provision_gcp_vm(deployment_id: str, cluster_name: str, group: dict, x: int)
             access.type_ = AccessConfig.Type.ONE_TO_ONE_NAT.name
             access.name = "External NAT"
             access.network_tier = access.NetworkTier.PREMIUM.name
-            access.nat_i_p = reserved_ip
+
+            if ip_address_type == IPAddressType.IPv4_RESERVED:
+                access.nat_i_p = reserved_ip
+
             network_interface.access_configs = [access]
 
         # Collect information into the Instance object.
@@ -363,11 +382,11 @@ def provision_gcp_vm(deployment_id: str, cluster_name: str, group: dict, x: int)
 
         instance.network_interfaces = [network_interface]
 
-        operation = instance_client.insert(
+        op = instance_client.insert(
             instance_resource=instance, project=gcp_project, zone=gcpzone
         )
 
-        wait_for_extended_operation(operation)
+        wait_for_extended_operation(op)
 
         logger.debug(f"GCP instance created: {instance.name}")
 
