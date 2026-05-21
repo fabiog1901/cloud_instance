@@ -54,6 +54,8 @@ def update_errors(error: str):
 
 
 def terminate_aws_vm(instance: dict):
+    # TODO: should remove EIP only if there is one
+    # currently there is a try catch to resolve this
 
     def get_allocation_id(public_ip, instance_id):
         response = ec2.describe_addresses(PublicIps=[public_ip])
@@ -75,7 +77,11 @@ def terminate_aws_vm(instance: dict):
     try:
         ec2 = boto3.client("ec2", region_name=instance["region"])
 
-        alloc = get_allocation_id(instance["public_ip"], instance["id"])
+        try:
+            alloc = get_allocation_id(instance["public_ip"], instance["id"])
+        except Exception as e:
+            logger.warning(e)
+            alloc = None
 
         response = ec2.terminate_instances(
             InstanceIds=[instance["id"]],
@@ -92,7 +98,8 @@ def terminate_aws_vm(instance: dict):
             logger.error(f"Unexpected response: {response}")
             update_errors(str(response))
 
-        ec2.release_address(AllocationId=alloc)
+        if alloc:
+            ec2.release_address(AllocationId=alloc)
 
     except Exception as e:
         update_errors(str(e))

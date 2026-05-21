@@ -235,7 +235,7 @@ def provision_gcp_vm(
 
         gcpzone = "-".join([group["region"], group["zone"]])
 
-        instance_name = deployment_id + "-" + str(random.randint(0, 1e16)).zfill(16)
+        instance_name = deployment_id + "-" + str(random.randint(0, 10**16)).zfill(16)
 
         instance_client = InstancesClient()
 
@@ -419,7 +419,7 @@ def provision_azure_vm(
         credential = EnvironmentCredential()
         client = ComputeManagementClient(credential, azure_subscription_id)
 
-        instance_name = deployment_id + "-" + str(random.randint(0, 1e16)).zfill(16)
+        instance_name = deployment_id + "-" + str(random.randint(0, 10**16)).zfill(16)
 
         def get_type(x):
             return {
