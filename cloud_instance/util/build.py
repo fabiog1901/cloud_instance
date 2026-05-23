@@ -1,7 +1,6 @@
 import logging
 from threading import Lock, Thread
 
-from ..models.ip_address import IPAddressType
 from .provision import provision_aws_vm, provision_azure_vm, provision_gcp_vm
 
 logger = logging.getLogger("cloud_instance")
@@ -13,7 +12,6 @@ def build(
     deployment_id: str,
     deployment: list[dict],
     _current_instances: list[dict],
-    ip_address_type: IPAddressType = IPAddressType.IPv4_EPHEMERAL,
 ):
     # 4. loop through the 'deployment' struct
     #    - through each cluster and copies
@@ -35,7 +33,6 @@ def build(
                 f"{cluster_name}-{x}",
                 cluster,
                 deployment_id,
-                ip_address_type,
             )
             new_vms += _new_vms
             surplus_vms += _surplus_vms
@@ -48,7 +45,6 @@ def build_cluster(
     cluster_name: str,
     cluster: dict,
     deployment_id,
-    ip_address_type: IPAddressType = IPAddressType.IPv4_EPHEMERAL,
 ):
     # for each group in the cluster,
     # put all cluster defaults into the group
@@ -61,7 +57,6 @@ def build_cluster(
             cluster_name,
             merge_dicts(cluster, group),
             deployment_id,
-            ip_address_type,
         )
         new_vms += _new_vms
         surplus_vms += _surplus_vms
@@ -74,7 +69,6 @@ def build_group(
     cluster_name: str,
     group: dict,
     deployment_id,
-    ip_address_type: IPAddressType = IPAddressType.IPv4_EPHEMERAL,
 ):
     # for each group, compare what is in 'deployment' to what is in 'current_deployment':
     #     case NO DIFFERENCE
@@ -118,8 +112,6 @@ def build_group(
             }.get(group["cloud"])
 
             args = (deployment_id, cluster_name, group, x)
-            if group["cloud"] == "aws":
-                args = (*args, ip_address_type)
 
             new_vms.append(
                 Thread(

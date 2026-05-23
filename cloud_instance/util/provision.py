@@ -94,12 +94,19 @@ def provision_aws_vm(
     cluster_name: str,
     group: dict,
     x: int,
-    ip_address_type: IPAddressType = IPAddressType.IPv4_EPHEMERAL,
 ):
     logger.debug("++aws %s %s %s" % (cluster_name, group["region"], x))
     allocation_id = None
     eip_associated = False
     ec2 = None
+
+    def get_ip_address_type(x):
+        try:
+            return IPAddressType(
+                x.get("ip_address_type", IPAddressType.IPv4_EPHEMERAL.value)
+            )
+        except ValueError:
+            raise ValueError(f"Invalid ip_address_type: {x['ip_address_type']}") from None
 
     # volumes
     def get_type(x):
@@ -113,6 +120,7 @@ def provision_aws_vm(
 
     try:
         vols = [group["volumes"]["os"]] + group["volumes"]["data"]
+        ip_address_type = get_ip_address_type(group)
 
         bdm = []
 

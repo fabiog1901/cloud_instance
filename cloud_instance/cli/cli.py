@@ -17,7 +17,6 @@ from ..models.resize import resize
 from ..models.slated import slated
 
 from .. import __version__
-from ..models.ip_address import IPAddressType
 
 # setup global logger
 logger = logging.getLogger("cloud_instance")
@@ -74,11 +73,6 @@ def cli_create(
         show_default=False,
         help="Whether to preserve existing VMs.",
     ),
-    ip_address_type: IPAddressType = typer.Option(
-        IPAddressType.IPv4_EPHEMERAL,
-        "--ip-address-type",
-        help="Public IP mode. IPv6 is currently supported for AWS only.",
-    ),
 ):
 
     logger.info(f"START: create {deployment_id=}")
@@ -89,7 +83,6 @@ def cli_create(
             json.loads(deployment),
             json.loads(defaults),
             preserve,
-            ip_address_type,
         )
     except Exception as e:
         print(e, file=sys.stderr)
