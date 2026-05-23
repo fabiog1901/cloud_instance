@@ -97,6 +97,9 @@ def provision_aws_vm(
     ip_address_type: IPAddressType = IPAddressType.IPv4_EPHEMERAL,
 ):
     logger.debug("++aws %s %s %s" % (cluster_name, group["region"], x))
+    allocation_id = None
+    eip_associated = False
+    ec2 = None
 
     # volumes
     def get_type(x):
@@ -154,6 +157,7 @@ def provision_aws_vm(
         tags.append(
             {"Key": "extra_vars", "Value": json.dumps(group.get("extra_vars", {}))}
         )
+        tags.append({"Key": "ip_address_type", "Value": ip_address_type.value})
 
         if group.get("role", None):
             role = {"Name": group["role"]}
@@ -171,6 +175,20 @@ def provision_aws_vm(
 
         ec2 = boto3.client("ec2", region_name=group["region"])
 
+        network_interface = {
+            "Groups": group["security_groups"],
+            "DeviceIndex": 0,
+            "SubnetId": group["subnet"],
+        }
+
+        if group["public_ip"] and ip_address_type == IPAddressType.IPv6:
+            network_interface["AssociatePublicIpAddress"] = False
+            network_interface["Ipv6AddressCount"] = 1
+        elif group["public_ip"] and ip_address_type == IPAddressType.IPv4_RESERVED:
+            network_interface["AssociatePublicIpAddress"] = False
+        else:
+            network_interface["AssociatePublicIpAddress"] = group["public_ip"]
+
         response = ec2.run_instances(
             DryRun=False,
             BlockDeviceMappings=bdm,
@@ -181,14 +199,7 @@ def provision_aws_vm(
             MinCount=1,
             UserData=group.get("user_data", ""),
             IamInstanceProfile=role,
-            NetworkInterfaces=[
-                {
-                    "Groups": group["security_groups"],
-                    "DeviceIndex": 0,
-                    "SubnetId": group["subnet"],
-                    "AssociatePublicIpAddress": group["public_ip"],
-                }
-            ],
+            NetworkInterfaces=[network_interface],
             TagSpecifications=[
                 {
                     "ResourceType": "instance",
@@ -201,12 +212,22 @@ def provision_aws_vm(
         waiter = ec2.get_waiter("instance_running")
         waiter.wait(InstanceIds=[response["Instances"][0]["InstanceId"]])
 
-        if ip_address_type == IPAddressType.IPv4_RESERVED:
-            allocation = ec2.allocate_address(Domain="vpc")
-            resp = ec2.associate_address(
-                AllocationId=allocation["AllocationId"],
+        if group["public_ip"] and ip_address_type == IPAddressType.IPv4_RESERVED:
+            allocation = ec2.allocate_address(
+                Domain="vpc",
+                TagSpecifications=[
+                    {
+                        "ResourceType": "elastic-ip",
+                        "Tags": tags,
+                    },
+                ],
+            )
+            allocation_id = allocation["AllocationId"]
+            ec2.associate_address(
+                AllocationId=allocation_id,
                 InstanceId=response["Instances"][0]["InstanceId"],
             )
+            eip_associated = True
 
         # fetch details about the newly created instance
         response = ec2.describe_instances(
@@ -216,6 +237,11 @@ def provision_aws_vm(
         # add the instance to the list
         update_new_deployment(parse_aws_query(response))
     except Exception as e:
+        if ec2 and allocation_id and not eip_associated:
+            try:
+                ec2.release_address(AllocationId=allocation_id)
+            except Exception as release_error:
+                logger.warning(release_error)
         update_errors(e)
 
 

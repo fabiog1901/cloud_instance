@@ -1,3 +1,4 @@
+import ipaddress
 import logging
 import os
 from threading import Lock, Thread
@@ -13,6 +14,7 @@ from azure.mgmt.compute import ComputeManagementClient
 from google.cloud.compute_v1 import InstancesClient
 from google.cloud.compute_v1.services.addresses.client import AddressesClient
 
+from ..models.ip_address import IPAddressType
 from .fetch import fetch
 
 logger = logging.getLogger("cloud_instance")
@@ -54,34 +56,52 @@ def update_errors(error: str):
 
 
 def terminate_aws_vm(instance: dict):
-    # TODO: should remove EIP only if there is one
-    # currently there is a try catch to resolve this
-
-    def get_allocation_id(public_ip, instance_id):
-        response = ec2.describe_addresses(PublicIps=[public_ip])
+    def get_allocation_id(instance_id):
+        response = ec2.describe_addresses(
+            Filters=[
+                {"Name": "instance-id", "Values": [instance_id]},
+                {
+                    "Name": "tag:ip_address_type",
+                    "Values": [IPAddressType.IPv4_RESERVED.value],
+                },
+            ]
+        )
 
         for address in response["Addresses"]:
-            # Check if the EIP is associated with the given instance ID
             if address.get("InstanceId") == instance_id:
-                public_ip = address.get("PublicIp")
-                allocation_id = address.get("AllocationId")
-                print(
-                    f"Instance {instance_id} has EIP {public_ip} with Allocation ID {allocation_id}"
-                )
-                return allocation_id
+                return address.get("AllocationId")
 
-        raise ValueError(f"No Elastic IP found associated with instance {instance_id}")
+        return None
+
+    def get_allocation_id_by_public_ip(public_ip, instance_id):
+        try:
+            response = ec2.describe_addresses(PublicIps=[public_ip])
+        except Exception as e:
+            logger.warning(e)
+            return None
+
+        for address in response["Addresses"]:
+            if address.get("InstanceId") == instance_id:
+                return address.get("AllocationId")
+
+        return None
+
+    def is_ipv4_address(address):
+        try:
+            return ipaddress.ip_address(address).version == 4
+        except (TypeError, ValueError):
+            return False
 
     logger.info(f"--aws {instance['id']}")
 
     try:
         ec2 = boto3.client("ec2", region_name=instance["region"])
 
-        try:
-            alloc = get_allocation_id(instance["public_ip"], instance["id"])
-        except Exception as e:
-            logger.warning(e)
-            alloc = None
+        alloc = None
+        if instance.get("ip_address_type") == IPAddressType.IPv4_RESERVED.value:
+            alloc = get_allocation_id(instance["id"])
+        elif is_ipv4_address(instance.get("public_ip")):
+            alloc = get_allocation_id_by_public_ip(instance["public_ip"], instance["id"])
 
         response = ec2.terminate_instances(
             InstanceIds=[instance["id"]],

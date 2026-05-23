@@ -2,6 +2,16 @@ import json
 
 from google.cloud.compute_v1.types import Instance
 
+from ..models.ip_address import IPAddressType
+
+
+def first_aws_ipv6_address(instance: dict):
+    for interface in instance.get("NetworkInterfaces", []):
+        for address in interface.get("Ipv6Addresses", []):
+            if address.get("Ipv6Address"):
+                return address["Ipv6Address"]
+    return None
+
 
 def parse_aws_query(ec2_response: dict):
     instances: list[dict] = []
@@ -12,6 +22,9 @@ def parse_aws_query(ec2_response: dict):
             for t in i["Tags"]:
                 tags[t["Key"]] = t["Value"]
 
+            public_ipv4 = i.get("PublicIpAddress")
+            public_ipv6 = first_aws_ipv6_address(i)
+
             instances.append(
                 {
                     # cloud instance id, useful for deleting
@@ -21,8 +34,10 @@ def parse_aws_query(ec2_response: dict):
                     "region": i["Placement"]["AvailabilityZone"][:-1],
                     "zone": i["Placement"]["AvailabilityZone"][-1],
                     # addresses
-                    "public_ip": i["PublicIpAddress"],
-                    "public_hostname": i["PublicDnsName"],
+                    "public_ip": public_ipv4 or public_ipv6,
+                    "public_ipv4": public_ipv4,
+                    "public_ipv6": public_ipv6,
+                    "public_hostname": i.get("PublicDnsName", ""),
                     "private_ip": i["PrivateIpAddress"],
                     "private_hostname": i["PrivateDnsName"],
                     # tags
@@ -31,6 +46,9 @@ def parse_aws_query(ec2_response: dict):
                     "cluster_name": tags["cluster_name"],
                     "group_name": tags["group_name"],
                     "extra_vars": tags["extra_vars"],
+                    "ip_address_type": tags.get(
+                        "ip_address_type", IPAddressType.IPv4_EPHEMERAL.value
+                    ),
                 }
             )
     return instances
