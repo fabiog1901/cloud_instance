@@ -8,6 +8,7 @@ from ..util.build import build
 from ..util.fetch import fetch
 from ..util.provision import provision
 from ..util.terminate import terminate
+from .ip_address import IPAddressType
 
 
 def create(
@@ -15,6 +16,7 @@ def create(
     deployment: list,
     defaults: dict,
     preserve: bool,
+    ip_address_type: IPAddressType = IPAddressType.IPv4_EPHEMERAL,
 ) -> list[dict]:
 
     logger.info(f"Fetching all instances with {deployment_id=}")
@@ -34,6 +36,7 @@ def create(
         deployment_id,
         deployment,
         current_instances,
+        ip_address_type,
     )
 
     logger.info(f"current_vms count={len(current_vms)}")
