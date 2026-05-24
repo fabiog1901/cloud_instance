@@ -2,7 +2,7 @@ import logging
 from threading import Lock, Thread
 
 from ..models import CloudInstance, Group, InstanceDefaults, ProvisionTask
-from ..providers import aws, gcp
+from ..providers import aws, azure, gcp, kloigos
 from .errors import operation_error
 
 logger = logging.getLogger("cloud_instance")
@@ -56,7 +56,9 @@ def provision(
     for task in new_vms:
         target = {
             "aws": aws.provision_vm,
+            "azure": azure.provision_vm,
             "gcp": gcp.provision_vm,
+            "kloigos": kloigos.provision_vm,
         }.get(task.group.cloud)
         if target is None:
             update_errors(f"Unsupported cloud provider: {task.group.cloud}")

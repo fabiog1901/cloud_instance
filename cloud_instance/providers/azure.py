@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import random
 
 from azure.identity import EnvironmentCredential
 from azure.mgmt.compute import ComputeManagementClient
@@ -9,6 +8,10 @@ from azure.mgmt.compute import ComputeManagementClient
 from ..models import CloudInstance, Group
 
 logger = logging.getLogger("cloud_instance")
+
+
+def fetch_instances(deployment_id: str, update_instances_list, update_errors):
+    logger.debug("Azure fetch is not implemented")
 
 
 def parse_instance(vm, private_ip, public_ip, public_hostname) -> list[CloudInstance]:
@@ -39,157 +42,9 @@ def provision_vm(
     get_instance_type,
     update_new_deployment,
     update_errors,
-    azure_subscription_id,
-    azure_resource_group,
 ):
     logger.debug("++azure %s %s %s" % (cluster_name, group.group_name, x))
-
-    try:
-        credential = EnvironmentCredential()
-        client = ComputeManagementClient(credential, azure_subscription_id)
-
-        instance_name = deployment_id + "-" + str(random.randint(0, 10**16)).zfill(16)
-
-        def get_type(x):
-            return {
-                "standard_ssd": "Premium_LRS",
-                "premium_ssd": "PremiumV2_LRS",
-                "local_ssd": "Premium_LRS",
-                "standard_hdd": "Standard_LRS",
-                "premium_hdd": "Standard_LRS",
-            }.get(x, "Premium_LRS")
-
-        vols = []
-
-        for i, x in enumerate(group.volumes.data):
-            poller = client.disks.begin_create_or_update(
-                azure_resource_group,
-                instance_name + "-disk-" + str(i),
-                {
-                    "location": group.region,
-                    "sku": {"name": get_type((x.type or "standard_ssd"))},
-                    "disk_size_gb": int((x.size or 100)),
-                    "creation_data": {"create_option": "Empty"},
-                },
-            )
-
-            data_disk = poller.result()
-
-            disk = {
-                "lun": i,
-                "name": instance_name + "-disk-" + str(i),
-                "create_option": "Attach",
-                "delete_option": (
-                    "Delete"
-                    if (
-                        x.delete_on_termination
-                        if x.delete_on_termination is not None
-                        else True
-                    )
-                    else "Detach"
-                ),
-                "managed_disk": {"id": data_disk.id},
-            }
-            vols.append(disk)
-
-        publisher, offer, sku, version = group.image.split(":")
-
-        nsg = None
-        if group.security_groups:
-            nsg = {
-                "id": "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkSecurityGroups/%s"
-                % (
-                    azure_subscription_id,
-                    azure_resource_group,
-                    group.security_groups[0],
-                )
-            }
-
-        client.virtual_machines.begin_create_or_update(
-            azure_resource_group,
-            instance_name,
-            {
-                "location": group.region,
-                "tags": {
-                    "deployment_id": deployment_id,
-                    "ansible_user": group.user,
-                    "cluster_name": cluster_name,
-                    "group_name": group.group_name,
-                    "inventory_groups": json.dumps(
-                        group.inventory_groups + [cluster_name]
-                    ),
-                    "extra_vars": json.dumps(group.extra_vars),
-                },
-                "storage_profile": {
-                    "osDisk": {
-                        "createOption": "fromImage",
-                        "managedDisk": {"storageAccountType": "Premium_LRS"},
-                        "deleteOption": "delete",
-                    },
-                    "image_reference": {
-                        "publisher": publisher,
-                        "offer": offer,
-                        "sku": sku,
-                        "version": version,
-                    },
-                    "data_disks": vols,
-                },
-                "hardware_profile": {
-                    "vm_size": get_instance_type(group),
-                },
-                "os_profile": {
-                    "computer_name": instance_name,
-                    "admin_username": group.user,
-                    "linux_configuration": {
-                        "ssh": {
-                            "public_keys": [
-                                {
-                                    "path": "/home/%s/.ssh/authorized_keys"
-                                    % group.user,
-                                    "key_data": group.public_key_id,
-                                }
-                            ]
-                        }
-                    },
-                },
-                "network_profile": {
-                    "network_api_version": "2021-04-01",
-                    "network_interface_configurations": [
-                        {
-                            "name": instance_name + "-nic",
-                            "delete_option": "delete",
-                            "network_security_group": nsg,
-                            "ip_configurations": [
-                                {
-                                    "name": instance_name + "-nic",
-                                    "subnet": {
-                                        "id": "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks/%s/subnets/%s"
-                                        % (
-                                            azure_subscription_id,
-                                            azure_resource_group,
-                                            group.vpc_id,
-                                            group.subnet,
-                                        )
-                                    },
-                                    "public_ip_address_configuration": {
-                                        "name": instance_name + "-pip",
-                                        "sku": {
-                                            "name": "Standard",
-                                            "tier": "Regional",
-                                        },
-                                        "delete_option": "delete",
-                                        "public_ip_allocation_method": "static",
-                                    },
-                                }
-                            ],
-                        }
-                    ],
-                },
-            },
-        ).result()
-
-    except Exception as e:
-        update_errors(e)
+    update_errors("Azure provisioning is not implemented")
 
 
 def terminate_vm(instance: CloudInstance, update_errors):

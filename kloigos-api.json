@@ -1,0 +1,2146 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Κλοηγός / Kloigos",
+        "version": "0.3.0"
+    },
+    "servers": [
+        {
+            "url": "/api"
+        }
+    ],
+    "paths": {
+        "/auth/login": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Oidc Login",
+                "description": "Start the browser OIDC login flow and store anti-CSRF cookies.",
+                "operationId": "oidc_login_auth_login_get",
+                "parameters": [
+                    {
+                        "name": "next",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "/",
+                            "title": "Next"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/callback": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Oidc Callback",
+                "description": "Finish the OIDC login flow, validate the ID token, and set the session cookie.",
+                "operationId": "oidc_callback_auth_callback_get",
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Code"
+                        }
+                    },
+                    {
+                        "name": "state",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "State"
+                        }
+                    },
+                    {
+                        "name": "error",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Error"
+                        }
+                    },
+                    {
+                        "name": "error_description",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Error Description"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Oidc Logout",
+                "description": "Clear the OIDC session cookie and write a logout audit event.",
+                "operationId": "oidc_logout_auth_logout_post",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ]
+            }
+        },
+        "/auth/me": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Oidc Me",
+                "description": "Return the current caller's claims plus Kloigos-specific auth metadata.",
+                "operationId": "oidc_me_auth_me_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Oidc Me Auth Me Get"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ]
+            }
+        },
+        "/compute_units/allocate": {
+            "post": {
+                "tags": [
+                    "compute_units"
+                ],
+                "summary": "Allocate a Compute Unit.",
+                "description": "Reserve a free compute unit and schedule the background allocation playbook.\n\nThe endpoint returns quickly once the unit is reserved. The slower machine\npreparation work continues in the background.",
+                "operationId": "allocate_compute_units_allocate_post",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ComputeUnitRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "title": "Response Allocate Compute Units Allocate Post"
+                                }
+                            }
+                        }
+                    },
+                    "460": {
+                        "description": "No free compute unit found to match the request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Request"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The compute unit was reserved but the allocation request could not be prepared",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Request"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ]
+            }
+        },
+        "/compute_units/deallocate/{compute_id}": {
+            "delete": {
+                "tags": [
+                    "compute_units"
+                ],
+                "summary": "Deallocate a Compute Unit.",
+                "description": "Mark a compute unit for deallocation and schedule the cleanup playbook.\n\nThe endpoint validates that the unit exists and is in a state where cleanup\nmakes sense before queueing the background job.",
+                "operationId": "deallocate_compute_units_deallocate__compute_id__delete",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "compute_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Compute Id"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The requested compute unit does not exist",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Request"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The compute unit is in a state that cannot be deallocated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Request"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The deallocation request could not be prepared",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Request"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/compute_units/": {
+            "get": {
+                "tags": [
+                    "compute_units"
+                ],
+                "summary": "List Compute Units",
+                "description": "Return compute units, optionally filtered by id, host, region, size, tags, or status.\n\nExample:\n- /compute_units\n- /compute_units?deployment_id=web_app_v1\n- /compute_units?status=FREE",
+                "operationId": "list_compute_units_compute_units__get",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "compute_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Compute Id"
+                        }
+                    },
+                    {
+                        "name": "hostname",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Hostname"
+                        }
+                    },
+                    {
+                        "name": "region",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Region"
+                        }
+                    },
+                    {
+                        "name": "zone",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Zone"
+                        }
+                    },
+                    {
+                        "name": "cpu_count",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Cpu Count"
+                        }
+                    },
+                    {
+                        "name": "deployment_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Deployment Id"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Status"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ComputeUnitOverview"
+                                    },
+                                    "title": "Response List Compute Units Compute Units  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/playbooks/{playbook}": {
+            "patch": {
+                "tags": [
+                    "playbooks"
+                ],
+                "summary": "Update Playbook",
+                "operationId": "update_playbook_admin_playbooks__playbook__patch",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "playbook",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/Playbook"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "string",
+                                "description": "The base64 encoded string",
+                                "title": "B64"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "tags": [
+                    "playbooks"
+                ],
+                "summary": "Get Playbook",
+                "operationId": "get_playbook_admin_playbooks__playbook__get",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "playbook",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/Playbook"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "title": "Response Get Playbook Admin Playbooks  Playbook  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/servers/": {
+            "get": {
+                "tags": [
+                    "servers"
+                ],
+                "summary": "List Servers",
+                "operationId": "list_servers_admin_servers__get",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "hostname",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Hostname"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ServerInDB"
+                                    },
+                                    "title": "Response List Servers Admin Servers  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "servers"
+                ],
+                "summary": "Init Server",
+                "operationId": "init_server_admin_servers__post",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ServerInitRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "servers"
+                ],
+                "summary": "Decommission Server",
+                "operationId": "decommission_server_admin_servers__put",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ServerDecommRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/servers/{hostname}": {
+            "delete": {
+                "tags": [
+                    "servers"
+                ],
+                "summary": "Delete Server",
+                "operationId": "delete_server_admin_servers__hostname__delete",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "hostname",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Hostname"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/events": {
+            "get": {
+                "tags": [
+                    "events"
+                ],
+                "summary": "List Events",
+                "operationId": "list_events_admin_events_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/LogMsg"
+                                    },
+                                    "type": "array",
+                                    "title": "Response List Events Admin Events Get"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ]
+            }
+        },
+        "/admin/api_keys/": {
+            "get": {
+                "tags": [
+                    "api_keys"
+                ],
+                "summary": "List Api Keys",
+                "operationId": "list_api_keys_admin_api_keys__get",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "access_key",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Access Key"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ApiKeySummary"
+                                    },
+                                    "title": "Response List Api Keys Admin Api Keys  Get"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "api_keys"
+                ],
+                "summary": "Create Api Key",
+                "operationId": "create_api_key_admin_api_keys__post",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiKeyCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiKeyCreateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "valid_until must be in the future.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Request"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/api_keys/{access_key}": {
+            "delete": {
+                "tags": [
+                    "api_keys"
+                ],
+                "summary": "Delete Api Key",
+                "operationId": "delete_api_key_admin_api_keys__access_key__delete",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "access_key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Access Key"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "API key not found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Request"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/settings/": {
+            "get": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "List Settings",
+                "operationId": "list_settings_admin_settings__get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "items": {
+                                        "$ref": "#/components/schemas/SettingRecord"
+                                    },
+                                    "type": "array",
+                                    "title": "Response List Settings Admin Settings  Get"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ]
+            }
+        },
+        "/admin/settings/{key}": {
+            "get": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Get Setting",
+                "operationId": "get_setting_admin_settings__key__get",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SettingKey"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SettingRecord"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Setting not found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Request"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Update Setting",
+                "operationId": "update_setting_admin_settings__key__patch",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SettingKey"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SettingUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SettingRecord"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Setting not found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Request"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "settings"
+                ],
+                "summary": "Reset Setting",
+                "operationId": "reset_setting_admin_settings__key__put",
+                "security": [
+                    {
+                        "APIKeyCookie": []
+                    },
+                    {
+                        "XAccessKey": []
+                    },
+                    {
+                        "XSignature": []
+                    },
+                    {
+                        "XTimestamp": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SettingKey"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SettingRecord"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Setting not found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Request"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ApiKeyCreateRequest": {
+                "properties": {
+                    "valid_until": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Valid Until"
+                    },
+                    "roles": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "$ref": "#/components/schemas/KloigosRole"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Roles"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "valid_until"
+                ],
+                "title": "ApiKeyCreateRequest"
+            },
+            "ApiKeyCreateResponse": {
+                "properties": {
+                    "access_key": {
+                        "type": "string",
+                        "title": "Access Key"
+                    },
+                    "owner": {
+                        "type": "string",
+                        "title": "Owner"
+                    },
+                    "valid_until": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Valid Until"
+                    },
+                    "roles": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "$ref": "#/components/schemas/KloigosRole"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Roles"
+                    },
+                    "secret_access_key": {
+                        "type": "string",
+                        "title": "Secret Access Key"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "access_key",
+                    "owner",
+                    "valid_until",
+                    "secret_access_key"
+                ],
+                "title": "ApiKeyCreateResponse"
+            },
+            "ApiKeySummary": {
+                "properties": {
+                    "access_key": {
+                        "type": "string",
+                        "title": "Access Key"
+                    },
+                    "owner": {
+                        "type": "string",
+                        "title": "Owner"
+                    },
+                    "valid_until": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Valid Until"
+                    },
+                    "roles": {
+                        "anyOf": [
+                            {
+                                "items": {
+                                    "$ref": "#/components/schemas/KloigosRole"
+                                },
+                                "type": "array"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Roles"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "access_key",
+                    "owner",
+                    "valid_until"
+                ],
+                "title": "ApiKeySummary"
+            },
+            "ComputeUnitOverview": {
+                "properties": {
+                    "compute_id": {
+                        "type": "string",
+                        "title": "Compute Id"
+                    },
+                    "hostname": {
+                        "type": "string",
+                        "title": "Hostname"
+                    },
+                    "cpu_range": {
+                        "type": "string",
+                        "title": "Cpu Range"
+                    },
+                    "cpu_count": {
+                        "type": "integer",
+                        "title": "Cpu Count"
+                    },
+                    "cpu_set": {
+                        "type": "string",
+                        "title": "Cpu Set"
+                    },
+                    "port_range": {
+                        "type": "string",
+                        "title": "Port Range"
+                    },
+                    "cu_user": {
+                        "type": "string",
+                        "title": "Cu User"
+                    },
+                    "status": {
+                        "type": "string",
+                        "title": "Status"
+                    },
+                    "started_at": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Started At"
+                    },
+                    "tags": {
+                        "anyOf": [
+                            {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Tags"
+                    },
+                    "ip": {
+                        "type": "string",
+                        "title": "Ip"
+                    },
+                    "region": {
+                        "type": "string",
+                        "title": "Region"
+                    },
+                    "zone": {
+                        "type": "string",
+                        "title": "Zone"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "compute_id",
+                    "hostname",
+                    "cpu_range",
+                    "cpu_count",
+                    "cpu_set",
+                    "port_range",
+                    "cu_user",
+                    "status",
+                    "ip",
+                    "region",
+                    "zone"
+                ],
+                "title": "ComputeUnitOverview"
+            },
+            "ComputeUnitRequest": {
+                "properties": {
+                    "compute_id": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Compute Id"
+                    },
+                    "cpu_count": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Cpu Count"
+                    },
+                    "region": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Region"
+                    },
+                    "zone": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Zone"
+                    },
+                    "tags": {
+                        "anyOf": [
+                            {
+                                "additionalProperties": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "integer"
+                                        },
+                                        {
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "type": "array"
+                                        }
+                                    ]
+                                },
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Tags"
+                    },
+                    "ssh_public_key": {
+                        "type": "string",
+                        "title": "Ssh Public Key"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "tags",
+                    "ssh_public_key"
+                ],
+                "title": "ComputeUnitRequest"
+            },
+            "Event": {
+                "type": "string",
+                "enum": [
+                    "LOGIN",
+                    "LOGOUT",
+                    "UPDATE_PLAYBOOK",
+                    "API_KEY_CREATE",
+                    "API_KEY_DELETE",
+                    "SETTING_UPDATE",
+                    "SETTING_RESET",
+                    "SERVER_INIT_REQUEST",
+                    "SERVER_INIT_DONE",
+                    "SERVER_INIT_FAILED",
+                    "SERVER_DECOMM_REQUEST",
+                    "SERVER_DECOMM_DONE",
+                    "SERVER_DECOMM_FAILED",
+                    "SERVER_DELETE_REQUEST",
+                    "SERVER_DELETE_DONE",
+                    "SERVER_DELETE_FAILED",
+                    "CU_ALLOCATION_REQUEST",
+                    "CU_ALLOCATION_DONE",
+                    "CU_ALLOCATION_FAILED",
+                    "CU_DEALLOCATION_REQUEST",
+                    "CU_DEALLOCATION_DONE",
+                    "CU_DEALLOCATION_FAILED"
+                ],
+                "title": "Event"
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "KloigosRole": {
+                "type": "string",
+                "enum": [
+                    "KLOIGOS_READONLY",
+                    "KLOIGOS_USER",
+                    "KLOIGOS_ADMIN"
+                ],
+                "title": "KloigosRole"
+            },
+            "LogMsg": {
+                "properties": {
+                    "ts": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Ts"
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "title": "User Id"
+                    },
+                    "action": {
+                        "$ref": "#/components/schemas/Event"
+                    },
+                    "details": {
+                        "anyOf": [
+                            {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Details"
+                    },
+                    "request_id": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Request Id"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "user_id",
+                    "action"
+                ],
+                "title": "LogMsg"
+            },
+            "Playbook": {
+                "type": "string",
+                "enum": [
+                    "CU_ALLOCATE",
+                    "CU_DEALLOCATE",
+                    "SERVER_INIT",
+                    "SERVER_DECOMM"
+                ],
+                "title": "Playbook"
+            },
+            "Request": {
+                "properties": {},
+                "type": "object",
+                "title": "Request"
+            },
+            "ServerDecommRequest": {
+                "properties": {
+                    "hostname": {
+                        "type": "string",
+                        "title": "Hostname"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "hostname"
+                ],
+                "title": "ServerDecommRequest"
+            },
+            "ServerInDB": {
+                "properties": {
+                    "hostname": {
+                        "type": "string",
+                        "title": "Hostname"
+                    },
+                    "ip": {
+                        "type": "string",
+                        "title": "Ip"
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "title": "User Id"
+                    },
+                    "region": {
+                        "type": "string",
+                        "title": "Region"
+                    },
+                    "zone": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Zone"
+                    },
+                    "cpu_count": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Cpu Count"
+                    },
+                    "mem_gb": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Mem Gb"
+                    },
+                    "disk_count": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Disk Count"
+                    },
+                    "disk_size_gb": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Disk Size Gb"
+                    },
+                    "tags": {
+                        "anyOf": [
+                            {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Tags"
+                    },
+                    "status": {
+                        "type": "string",
+                        "title": "Status"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "hostname",
+                    "ip",
+                    "user_id",
+                    "region",
+                    "status"
+                ],
+                "title": "ServerInDB"
+            },
+            "ServerInitRequest": {
+                "properties": {
+                    "hostname": {
+                        "type": "string",
+                        "title": "Hostname"
+                    },
+                    "ip": {
+                        "type": "string",
+                        "title": "Ip"
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "title": "User Id"
+                    },
+                    "region": {
+                        "type": "string",
+                        "title": "Region"
+                    },
+                    "zone": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Zone"
+                    },
+                    "cpu_count": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Cpu Count"
+                    },
+                    "mem_gb": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Mem Gb"
+                    },
+                    "disk_count": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Disk Count"
+                    },
+                    "disk_size_gb": {
+                        "anyOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Disk Size Gb"
+                    },
+                    "tags": {
+                        "anyOf": [
+                            {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Tags"
+                    },
+                    "cpu_ranges": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Cpu Ranges"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "hostname",
+                    "ip",
+                    "user_id",
+                    "region",
+                    "cpu_ranges"
+                ],
+                "title": "ServerInitRequest"
+            },
+            "SettingKey": {
+                "type": "string",
+                "enum": [
+                    "PORTS_PER_CPU",
+                    "BASE_PORT",
+                    "MAX_CPUS_PER_SERVER",
+                    "KLOIGOS_ENTERPRISE_LICENSE_KEY",
+                    "OIDC_ENABLED",
+                    "OIDC_ISSUER_URL",
+                    "OIDC_CLIENT_ID",
+                    "OIDC_CLIENT_SECRET",
+                    "OIDC_SCOPES",
+                    "OIDC_AUDIENCE",
+                    "OIDC_EXTRA_AUTH_PARAMS",
+                    "OIDC_REDIRECT_URI",
+                    "OIDC_LOGIN_PATH",
+                    "OIDC_SESSION_COOKIE_NAME",
+                    "OIDC_STATE_COOKIE_NAME",
+                    "OIDC_NONCE_COOKIE_NAME",
+                    "OIDC_NEXT_COOKIE_NAME",
+                    "OIDC_COOKIE_SECURE",
+                    "OIDC_COOKIE_SAMESITE",
+                    "OIDC_COOKIE_DOMAIN",
+                    "OIDC_VERIFY_AUDIENCE",
+                    "OIDC_UI_USERNAME_CLAIM",
+                    "OIDC_AUTHZ_READONLY_GROUPS",
+                    "OIDC_AUTHZ_USER_GROUPS",
+                    "OIDC_AUTHZ_ADMIN_GROUPS",
+                    "OIDC_AUTHZ_GROUPS_CLAIM"
+                ],
+                "title": "SettingKey"
+            },
+            "SettingRecord": {
+                "properties": {
+                    "key": {
+                        "$ref": "#/components/schemas/SettingKey"
+                    },
+                    "value": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Value"
+                    },
+                    "default_value": {
+                        "type": "string",
+                        "title": "Default Value"
+                    },
+                    "effective_value": {
+                        "type": "string",
+                        "title": "Effective Value"
+                    },
+                    "value_type": {
+                        "type": "string",
+                        "title": "Value Type"
+                    },
+                    "category": {
+                        "type": "string",
+                        "title": "Category"
+                    },
+                    "is_secret": {
+                        "type": "boolean",
+                        "title": "Is Secret",
+                        "default": false
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "Description",
+                        "default": ""
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Updated At"
+                    },
+                    "updated_by": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Updated By"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "key",
+                    "default_value",
+                    "effective_value",
+                    "value_type",
+                    "category",
+                    "updated_at"
+                ],
+                "title": "SettingRecord"
+            },
+            "SettingUpdateRequest": {
+                "properties": {
+                    "value": {
+                        "type": "string",
+                        "title": "Value"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "value"
+                ],
+                "title": "SettingUpdateRequest"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        },
+        "securitySchemes": {
+            "APIKeyCookie": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "kloigos_session"
+            },
+            "XAccessKey": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Kloigos-Access-Key"
+            },
+            "XSignature": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Kloigos-Signature"
+            },
+            "XTimestamp": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Timestamp"
+            }
+        }
+    }
+}

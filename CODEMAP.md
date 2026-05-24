@@ -48,5 +48,6 @@ python3 tools/generate_codemap.py
 | `cloud_instance/models.py` | Typed deployment schema and shared enums. classes: IPAddressType, CloudInstance, InstanceDefaults, GroupFilter, InstanceSpec, Volume, Volumes, Group, Cluster, Deployment, ProvisionTask, BuildResult |
 | `cloud_instance/providers/__init__.py` | no public classes/functions |
 | `cloud_instance/providers/aws.py` | AWS lifecycle implementation: fetch, parse, provision, and terminate. functions: first_ipv6_address, parse_instances, fetch_instances, provision_vm, terminate_vm, modify_vm, resize_vm |
-| `cloud_instance/providers/azure.py` | Azure lifecycle implementation: parse, provision, and terminate. functions: parse_instance, provision_vm, terminate_vm, modify_vm, resize_vm |
+| `cloud_instance/providers/azure.py` | Azure lifecycle implementation: parse, provision, and terminate. functions: fetch_instances, parse_instance, provision_vm, terminate_vm, modify_vm, resize_vm |
 | `cloud_instance/providers/gcp.py` | GCP lifecycle implementation: fetch, parse, provision, and terminate. functions: wait_for_extended_operation, parse_instance, fetch_instances, provision_vm, terminate_vm, modify_vm, resize_vm |
+| `cloud_instance/providers/kloigos.py` | functions: parse_instance, fetch_instances, provision_vm, terminate_vm, modify_vm, resize_vm, request, build_url, sign, is_configured |

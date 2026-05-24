@@ -2,9 +2,7 @@ import logging
 from threading import Lock, Thread
 
 from ..models import CloudInstance
-from ..providers.aws import terminate_vm as terminate_aws_vm
-from ..providers.azure import terminate_vm as terminate_azure_vm
-from ..providers.gcp import terminate_vm as terminate_gcp_vm
+from ..providers import aws, azure, gcp, kloigos
 from .errors import operation_error
 
 logger = logging.getLogger("cloud_instance")
@@ -20,9 +18,10 @@ def terminate(instances: list[CloudInstance]) -> None:
 
     for x in instances:
         target = {
-            "aws": terminate_aws_vm,
-            "gcp": terminate_gcp_vm,
-            "azure": terminate_azure_vm,
+            "aws": aws.terminate_vm,
+            "gcp": gcp.terminate_vm,
+            "azure": azure.terminate_vm,
+            "kloigos": kloigos.terminate_vm,
         }.get(x.cloud)
         if target is None:
             update_errors(f"Unsupported cloud provider: {x.cloud}")

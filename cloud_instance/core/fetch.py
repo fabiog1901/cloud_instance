@@ -2,8 +2,7 @@ import logging
 from threading import Lock, Thread
 
 from ..models import CloudInstance
-from ..providers.aws import fetch_instances as fetch_aws_instances
-from ..providers.gcp import fetch_instances as fetch_gcp_instances
+from ..providers import aws, azure, gcp, kloigos
 from .errors import operation_error
 
 logger = logging.getLogger("cloud_instance")
@@ -20,19 +19,13 @@ def fetch(deployment_id: str) -> list[CloudInstance]:
     instances = []
     errors = []
 
-    thread = Thread(
-        target=fetch_aws_instances,
-        args=(deployment_id, update_instances_list, update_errors),
-    )
-    thread.start()
-    threads.append(thread)
-
-    thread = Thread(
-        target=fetch_gcp_instances,
-        args=(deployment_id, update_instances_list, update_errors),
-    )
-    thread.start()
-    threads.append(thread)
+    for provider in (aws, azure, gcp, kloigos):
+        thread = Thread(
+            target=provider.fetch_instances,
+            args=(deployment_id, update_instances_list, update_errors),
+        )
+        thread.start()
+        threads.append(thread)
 
     for x in threads:
         x.join()

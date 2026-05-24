@@ -8,6 +8,7 @@ from ..models import CloudInstance, Group, GroupFilter, InstanceDefaults
 from ..providers.aws import modify_vm as modify_aws_vm
 from ..providers.azure import modify_vm as modify_azure_vm
 from ..providers.gcp import modify_vm as modify_gcp_vm
+from ..providers.kloigos import modify_vm as modify_kloigos_vm
 
 logger = logging.getLogger("cloud_instance")
 
@@ -91,6 +92,7 @@ def modify_instance(instance: CloudInstance, new_cpus_count: int):
         "aws": modify_aws_vm,
         "gcp": modify_gcp_vm,
         "azure": modify_azure_vm,
+        "kloigos": modify_kloigos_vm,
     }.get(instance.cloud)
     if target is None:
         update_errors(f"Unsupported cloud provider: {instance.cloud}")

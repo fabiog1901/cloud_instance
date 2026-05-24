@@ -8,6 +8,7 @@ from ..models import CloudInstance, GroupFilter
 from ..providers.aws import resize_vm as resize_aws_vm
 from ..providers.azure import resize_vm as resize_azure_vm
 from ..providers.gcp import resize_vm as resize_gcp_vm
+from ..providers.kloigos import resize_vm as resize_kloigos_vm
 
 logger = logging.getLogger("cloud_instance")
 
@@ -72,6 +73,7 @@ def resize_instance(instance: CloudInstance, new_disk_size: int):
         "aws": resize_aws_vm,
         "gcp": resize_gcp_vm,
         "azure": resize_azure_vm,
+        "kloigos": resize_kloigos_vm,
     }.get(instance.cloud)
     if target is None:
         update_errors(f"Unsupported cloud provider: {instance.cloud}")
