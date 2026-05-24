@@ -31,7 +31,7 @@ python3 tools/generate_codemap.py
 | File | Purpose / Public Surface |
 | --- | --- |
 | `cloud_instance/__init__.py` | no public classes/functions |
-| `cloud_instance/cli.py` | Typer CLI entrypoint. Parses JSON options and dispatches command handlers. functions: instances_to_json, cli_create, cli_gather, cli_slated, cli_modify, cli_resize, cli_delete, version_option |
+| `cloud_instance/cli.py` | Typer CLI entrypoint. Parses JSON options and dispatches command handlers. classes: ShorthandFormatter; functions: instances_to_json, exit_with_error, cli_create, cli_gather, cli_slated, cli_modify, cli_resize, cli_delete, version_option |
 | `cloud_instance/commands/__init__.py` | no public classes/functions |
 | `cloud_instance/commands/create.py` | Create/converge command: fetch current state, build delta, provision new instances, terminate surplus. functions: create |
 | `cloud_instance/commands/delete.py` | Delete command: fetch and terminate all instances for a deployment. functions: delete |
@@ -41,6 +41,7 @@ python3 tools/generate_codemap.py
 | `cloud_instance/commands/slated.py` | Slated command: show instances that would be deleted by convergence. functions: slated |
 | `cloud_instance/core/__init__.py` | no public classes/functions |
 | `cloud_instance/core/build.py` | Reconciliation planner. Compares desired deployment groups with fetched instances and creates provider work items. functions: build, build_cluster, build_group, matches_group, merge_cluster_group |
+| `cloud_instance/core/errors.py` | functions: error_message, format_errors, operation_error |
 | `cloud_instance/core/fetch.py` | Provider-neutral fetch coordinator. functions: fetch, update_instances_list, update_errors |
 | `cloud_instance/core/provision.py` | Provider-neutral provisioning coordinator. functions: update_new_deployment, update_errors, get_instance_type, provision, provision_aws_vm, provision_gcp_vm, provision_azure_vm |
 | `cloud_instance/core/terminate.py` | Provider-neutral termination coordinator. functions: terminate, update_errors |

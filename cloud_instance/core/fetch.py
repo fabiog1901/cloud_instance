@@ -1,6 +1,7 @@
 import logging
 from threading import Lock, Thread
 
+from .errors import operation_error
 from ..models import CloudInstance
 from ..providers.aws import fetch_instances as fetch_aws_instances
 from ..providers.gcp import fetch_instances as fetch_gcp_instances
@@ -8,7 +9,8 @@ from ..providers.gcp import fetch_instances as fetch_gcp_instances
 logger = logging.getLogger("cloud_instance")
 
 instances: list[CloudInstance] = []
-errors: list[str] = []
+errors: list[object] = []
+state_lock = Lock()
 
 
 def fetch(deployment_id: str) -> list[CloudInstance]:
@@ -38,20 +40,20 @@ def fetch(deployment_id: str) -> list[CloudInstance]:
     instances = sorted(instances, key=lambda x: x.id)
 
     if errors:
-        raise ValueError(f"Failed to fetch resources for {deployment_id=}")
+        raise operation_error(f"Fetch resources for {deployment_id=}", errors)
 
     return instances
 
 
 def update_instances_list(_instances: list[CloudInstance]):
     global instances
-    with Lock():
+    with state_lock:
         logger.debug("Updating instances list")
         instances.extend(_instances)
 
 
-def update_errors(error: str):
+def update_errors(error: object):
     global errors
     logger.error(error)
-    with Lock():
+    with state_lock:
         errors.append(error)

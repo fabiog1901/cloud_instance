@@ -2,6 +2,7 @@ import logging
 import os
 from threading import Lock, Thread
 
+from .errors import operation_error
 from ..models import CloudInstance, Group, InstanceDefaults, ProvisionTask, ProvisionTasks
 from ..providers.aws import provision_vm as provision_aws
 from ..providers.azure import provision_vm as provision_azure
@@ -10,21 +11,22 @@ from ..providers.gcp import provision_vm as provision_gcp
 logger = logging.getLogger("cloud_instance")
 
 instances: list[CloudInstance] = []
-errors: list[str] = []
+errors: list[object] = []
+state_lock = Lock()
 defaults = InstanceDefaults()
 
 
 def update_new_deployment(new_instances: list[CloudInstance]):
     global instances
-    with Lock():
+    with state_lock:
         logger.debug("Updating pre-existing instances list")
         instances.extend(new_instances)
 
 
-def update_errors(error: str):
+def update_errors(error: object):
     global errors
     logger.error(error)
-    with Lock():
+    with state_lock:
         errors.append(error)
 
 
@@ -55,12 +57,17 @@ def provision(
 
     threads = []
     for task in new_vms:
+        target = {
+            "aws": provision_aws_vm,
+            "gcp": provision_gcp_vm,
+            "azure": provision_azure_vm,
+        }.get(task.group.cloud)
+        if target is None:
+            update_errors(f"Unsupported cloud provider: {task.group.cloud}")
+            continue
+
         thread = Thread(
-            target={
-                "aws": provision_aws_vm,
-                "gcp": provision_gcp_vm,
-                "azure": provision_azure_vm,
-            }.get(task.group.cloud),
+            target=target,
             args=(task,),
         )
         thread.start()
@@ -70,7 +77,7 @@ def provision(
         x.join()
 
     if errors:
-        raise ValueError("Failed to provision instances.")
+        raise operation_error("Provision instances", errors)
 
     return instances
 

@@ -19,8 +19,8 @@ def create(
 
     try:
         current_instances = fetch(deployment_id)
-    except:
-        raise ValueError(f"Failed to fetch instances for {deployment_id=}")
+    except Exception as e:
+        raise ValueError(f"Failed to fetch instances for {deployment_id=}:\n{e}") from e
 
     logger.info(f"current_instances count={len(current_instances)}")
     for idx, x in enumerate(current_instances, start=1):
@@ -50,15 +50,17 @@ def create(
 
     try:
         new_instances = provision(build_result.new_vms, defaults)
-    except Exception:
-        raise ValueError(f"Failed to provision for {deployment_id=}.")
+    except Exception as e:
+        raise ValueError(f"Failed to provision for {deployment_id=}:\n{e}") from e
 
     if not preserve:
         logger.info("Deleting surplus_vms...")
         try:
             terminate(build_result.surplus_vms)
-        except:
-            raise ValueError(f"Failed to delete surplus_vms for {deployment_id=}.")
+        except Exception as e:
+            raise ValueError(
+                f"Failed to delete surplus_vms for {deployment_id=}:\n{e}"
+            ) from e
 
     result = list(new_instances)
     result.extend(build_result.current_vms)

@@ -69,6 +69,11 @@ def instances_to_json(instances: list[CloudInstance]) -> str:
     return json.dumps([x.to_dict() for x in instances])
 
 
+def exit_with_error(error: Exception) -> None:
+    print(f"Error: {error}", file=sys.stderr)
+    sys.exit(1)
+
+
 @app.command(
     name="create",
     help="Create the deployment",
@@ -107,8 +112,7 @@ def cli_create(
             preserve,
         )
     except Exception as e:
-        print(e, file=sys.stderr)
-        sys.exit(1)
+        exit_with_error(e)
 
     print(instances_to_json(result))
 
@@ -134,8 +138,7 @@ def cli_gather(
     try:
         result = gather(deployment_id)
     except Exception as e:
-        print(e, file=sys.stderr)
-        sys.exit(1)
+        exit_with_error(e)
 
     print(instances_to_json(result))
 
@@ -168,8 +171,7 @@ def cli_slated(
             Deployment.from_list(json.loads(deployment)),
         )
     except Exception as e:
-        print(e, file=sys.stderr)
-        sys.exit(1)
+        exit_with_error(e)
 
     print(instances_to_json(result))
 
@@ -220,14 +222,17 @@ def cli_modify(
 
     logger.info(f"START: modify {deployment_id=}")
 
-    modify(
-        deployment_id,
-        new_cpus_count,
-        GroupFilter.from_csv(filter_by_groups),
-        sequential,
-        pause_between,
-        InstanceDefaults.from_dict(json.loads(defaults)),
-    )
+    try:
+        modify(
+            deployment_id,
+            new_cpus_count,
+            GroupFilter.from_csv(filter_by_groups),
+            sequential,
+            pause_between,
+            InstanceDefaults.from_dict(json.loads(defaults)),
+        )
+    except Exception as e:
+        exit_with_error(e)
 
     logger.info(f"COMPLETED: modify {deployment_id=}")
 
@@ -272,13 +277,16 @@ def cli_resize(
 
     logger.info(f"START: resize {deployment_id=}")
 
-    resize(
-        deployment_id,
-        new_disk_size,
-        GroupFilter.from_csv(filter_by_groups),
-        sequential,
-        pause_between,
-    )
+    try:
+        resize(
+            deployment_id,
+            new_disk_size,
+            GroupFilter.from_csv(filter_by_groups),
+            sequential,
+            pause_between,
+        )
+    except Exception as e:
+        exit_with_error(e)
 
     logger.info(f"COMPLETED: resize {deployment_id=}")
 
@@ -299,7 +307,10 @@ def cli_delete(
 
     logger.info(f"START: delete {deployment_id=}")
 
-    delete(deployment_id)
+    try:
+        delete(deployment_id)
+    except Exception as e:
+        exit_with_error(e)
 
     logger.info(f"COMPLETED: delete {deployment_id=}")
 

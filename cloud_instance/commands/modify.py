@@ -2,6 +2,7 @@ import logging
 import time
 from threading import Lock, Thread
 
+from ..core.errors import operation_error
 from ..core.fetch import fetch
 from ..models import CloudInstance, Group, GroupFilter, InstanceDefaults
 from ..providers.aws import modify_vm as modify_aws_vm
@@ -10,14 +11,15 @@ from ..providers.gcp import modify_vm as modify_gcp_vm
 
 logger = logging.getLogger("cloud_instance")
 
-errors: list[str] = []
+errors: list[object] = []
+state_lock = Lock()
 defaults = InstanceDefaults()
 
 
-def update_errors(error: str):
+def update_errors(error: object):
     global errors
     logger.error(error)
-    with Lock():
+    with state_lock:
         errors.append(error)
 
 
@@ -48,8 +50,8 @@ def modify(
 
     try:
         current_instances = fetch(deployment_id)
-    except:
-        raise ValueError(f"Failed to fetch instances for {deployment_id=}")
+    except Exception as e:
+        raise ValueError(f"Failed to fetch instances for {deployment_id=}:\n{e}") from e
 
     logger.info(f"current_instances count={len(current_instances)}")
     for idx, x in enumerate(current_instances, start=1):
@@ -83,12 +85,17 @@ def modify(
             x.join()
 
     if errors:
-        raise ValueError(f"Failed to modify instances for {deployment_id=}")
+        raise operation_error(f"Modify instances for {deployment_id=}", errors)
 
 
 def modify_instance(instance: CloudInstance, new_cpus_count: int):
-    {
+    target = {
         "aws": modify_aws_vm,
         "gcp": modify_gcp_vm,
         "azure": modify_azure_vm,
-    }.get(instance.cloud)(instance, new_cpus_count, get_instance_type, update_errors)
+    }.get(instance.cloud)
+    if target is None:
+        update_errors(f"Unsupported cloud provider: {instance.cloud}")
+        return
+
+    target(instance, new_cpus_count, get_instance_type, update_errors)

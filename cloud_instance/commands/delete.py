@@ -11,8 +11,8 @@ errors: list[str] = []
 def delete(deployment_id: str) -> None:
     try:
         current_instances = fetch(deployment_id)
-    except:
-        raise ValueError(f"Failed to fetch instances for {deployment_id=}")
+    except Exception as e:
+        raise ValueError(f"Failed to fetch instances for {deployment_id=}:\n{e}") from e
 
     logger.info(f"current_instances count={len(current_instances)}")
     for idx, x in enumerate(current_instances, start=1):
@@ -22,5 +22,5 @@ def delete(deployment_id: str) -> None:
 
     try:
         terminate(current_instances)
-    except Exception:
-        raise ValueError("Failed at terminating instances.")
+    except Exception as e:
+        raise ValueError(f"Failed at terminating instances:\n{e}") from e

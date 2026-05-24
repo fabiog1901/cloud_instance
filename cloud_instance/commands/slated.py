@@ -15,8 +15,8 @@ def slated(
 
     try:
         current_instances = fetch(deployment_id)
-    except:
-        raise ValueError(f"Failed to fetch instances for {deployment_id=}")
+    except Exception as e:
+        raise ValueError(f"Failed to fetch instances for {deployment_id=}:\n{e}") from e
 
     logger.info(f"current_instances count={len(current_instances)}")
     for idx, x in enumerate(current_instances, start=1):

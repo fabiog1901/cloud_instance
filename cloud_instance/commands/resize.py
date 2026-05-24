@@ -2,6 +2,7 @@ import logging
 import time
 from threading import Lock, Thread
 
+from ..core.errors import operation_error
 from ..core.fetch import fetch
 from ..models import CloudInstance, GroupFilter
 from ..providers.aws import resize_vm as resize_aws_vm
@@ -10,13 +11,14 @@ from ..providers.gcp import resize_vm as resize_gcp_vm
 
 logger = logging.getLogger("cloud_instance")
 
-errors: list[str] = []
+errors: list[object] = []
+state_lock = Lock()
 
 
-def update_errors(error: str):
+def update_errors(error: object):
     global errors
     logger.error(error)
-    with Lock():
+    with state_lock:
         errors.append(error)
 
 
@@ -31,8 +33,8 @@ def resize(
 
     try:
         current_instances = fetch(deployment_id)
-    except:
-        raise ValueError(f"Failed to fetch instances for {deployment_id=}")
+    except Exception as e:
+        raise ValueError(f"Failed to fetch instances for {deployment_id=}:\n{e}") from e
 
     logger.info(f"current_instances count={len(current_instances)}")
     for idx, x in enumerate(current_instances, start=1):
@@ -64,12 +66,17 @@ def resize(
             x.join()
 
     if errors:
-        raise ValueError(f"Failed to resize instances for {deployment_id=}")
+        raise operation_error(f"Resize instances for {deployment_id=}", errors)
 
 
 def resize_instance(instance: CloudInstance, new_disk_size: int):
-    {
+    target = {
         "aws": resize_aws_vm,
         "gcp": resize_gcp_vm,
         "azure": resize_azure_vm,
-    }.get(instance.cloud)(instance, new_disk_size, update_errors)
+    }.get(instance.cloud)
+    if target is None:
+        update_errors(f"Unsupported cloud provider: {instance.cloud}")
+        return
+
+    target(instance, new_disk_size, update_errors)
