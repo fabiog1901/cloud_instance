@@ -2,6 +2,7 @@ import json
 import logging
 import platform
 import sys
+import time
 
 import typer
 
@@ -21,14 +22,32 @@ EPILOG = "Docs: <https://github.com/fabiog1901/cloud_instance>"
 logger = logging.getLogger("cloud_instance")
 logger.setLevel(logging.INFO)
 
+class ShorthandFormatter(logging.Formatter):
+    LEVEL_MAP = {
+        "DEBUG": "D",
+        "INFO": "I",
+        "WARNING": "W",
+        "ERROR": "E",
+        "CRITICAL": "C",
+    }
+
+    def format(self, record):
+        original_levelname = record.levelname
+        record.levelname = self.LEVEL_MAP.get(original_levelname, original_levelname)
+        result = super().format(record)
+        record.levelname = original_levelname
+        return result
+    
 # create console handler and set level to debug
 ch = logging.FileHandler(filename="/tmp/cloud_instance.log")
 ch.setLevel(logging.INFO)
 
 # create formatter
-formatter = logging.Formatter(
+formatter = ShorthandFormatter(
     "%(asctime)s [%(levelname)s] (%(threadName)s) %(filename)s:%(lineno)d %(message)s"
 )
+formatter.converter = time.gmtime
+formatter.default_msec_format = "%s.%03d"
 
 # add formatter to ch
 ch.setFormatter(formatter)
