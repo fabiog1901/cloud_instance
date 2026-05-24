@@ -20,7 +20,7 @@ from google.cloud.compute_v1 import (
 from google.cloud.compute_v1.services.addresses.client import AddressesClient
 from google.cloud.compute_v1.types import Address, Items, Metadata
 
-from ..models import CloudInstance, IPAddressType
+from ..models import CloudInstance, Group, IPAddressType, InstanceSpec
 
 logger = logging.getLogger("cloud_instance")
 
@@ -35,7 +35,7 @@ def wait_for_extended_operation(op):
     return result
 
 
-def parse_instance(instance: Instance, region, zone):
+def parse_instance(instance: Instance, region, zone) -> CloudInstance:
     tags = {}
     for x in instance.metadata.items:
         tags[x.key] = x.value
@@ -77,15 +77,13 @@ def fetch_instances(deployment_id: str, update_instances_list, update_errors):
         )
 
         agg_list = instance_client.aggregated_list(request=request)
-        instances = []
+        instances: list[CloudInstance] = []
 
         for zone, response in agg_list:
             if response.instances:
                 for x in response.instances:
                     if x.status in ("PROVISIONING", "STAGING", "RUNNING"):
-                        instances.append(
-                            parse_instance(x, zone[6:-2], zone[-1]).to_dict()
-                        )
+                        instances.append(parse_instance(x, zone[6:-2], zone[-1]))
 
         if instances:
             update_instances_list(instances)
@@ -97,21 +95,21 @@ def fetch_instances(deployment_id: str, update_instances_list, update_errors):
 def provision_vm(
     deployment_id: str,
     cluster_name: str,
-    group: dict,
+    group: Group,
     x: int,
     get_instance_type,
     update_new_deployment,
     update_errors,
     ip_address_type: IPAddressType = IPAddressType.IPv4_EPHEMERAL,
 ):
-    logger.info("++gcp %s %s %s" % (cluster_name, group["group_name"], x))
+    logger.info("++gcp %s %s %s" % (cluster_name, group.group_name, x))
 
     try:
         gcp_project = os.getenv("GCP_PROJECT")
         if not gcp_project:
             raise ValueError("GCP_PROJECT env var is not defined")
 
-        gcpzone = "-".join([group["region"], group["zone"]])
+        gcpzone = "-".join([group.region, group.zone])
 
         instance_name = deployment_id + "-" + str(random.randint(0, 10**16)).zfill(16)
 
@@ -122,7 +120,7 @@ def provision_vm(
 
             op = addresses_client.insert(
                 project=gcp_project,
-                region=group["region"],
+                region=group.region,
                 address_resource=Address(
                     name=f"{instance_name}-eip",
                 ),
@@ -131,7 +129,7 @@ def provision_vm(
 
             reserved = addresses_client.get(
                 project=gcp_project,
-                region=group["region"],
+                region=group.region,
                 address=f"{instance_name}-eip",
             )
             reserved_ip = reserved.address
@@ -154,25 +152,23 @@ def provision_vm(
         boot_disk = AttachedDisk()
         boot_disk.boot = True
         initialize_params = AttachedDiskInitializeParams()
-        initialize_params.source_image = group["image"]
-        initialize_params.disk_size_gb = int(group["volumes"]["os"].get("size", 30))
+        initialize_params.source_image = group.image
+        initialize_params.disk_size_gb = int((group.volumes.os.size or 30))
         initialize_params.disk_type = "zones/%s/diskTypes/%s" % (
             gcpzone,
-            get_type(group["volumes"]["os"].get("type", "standard_ssd")),
+            get_type((group.volumes.os.type or "standard_ssd")),
         )
         boot_disk.initialize_params = initialize_params
-        boot_disk.auto_delete = group["volumes"]["os"].get(
-            "delete_on_termination", True
-        )
+        boot_disk.auto_delete = (group.volumes.os.delete_on_termination if group.volumes.os.delete_on_termination is not None else True)
         vols.append(boot_disk)
 
-        for i, x in enumerate(group["volumes"]["data"]):
+        for i, x in enumerate(group.volumes.data):
             disk = AttachedDisk()
             init_params = AttachedDiskInitializeParams()
-            init_params.disk_size_gb = int(x.get("size", 100))
+            init_params.disk_size_gb = int((x.size or 100))
             disk.device_name = f"disk-{i}"
 
-            if get_type(x.get("type", "standard_ssd")) == "local-ssd":
+            if get_type((x.type or "standard_ssd")) == "local-ssd":
                 disk.type_ = "SCRATCH"
                 disk.interface = "NVME"
                 del init_params.disk_size_gb
@@ -180,18 +176,18 @@ def provision_vm(
 
             init_params.disk_type = "zones/%s/diskTypes/%s" % (
                 gcpzone,
-                get_type(x.get("type", "standard_ssd")),
+                get_type((x.type or "standard_ssd")),
             )
 
             disk.initialize_params = init_params
-            disk.auto_delete = x.get("delete_on_termination", True)
+            disk.auto_delete = (x.delete_on_termination if x.delete_on_termination is not None else True)
 
             vols.append(disk)
 
         tags = Metadata()
         l = []
 
-        for k, v in group.get("tags", {}).items():
+        for k, v in group.tags.items():
             item = Items()
             item.key = k
             item.value = v
@@ -199,7 +195,7 @@ def provision_vm(
 
         item = Items()
         item.key = "ansible_user"
-        item.value = group["user"]
+        item.value = group.user
         l.append(item)
 
         item = Items()
@@ -209,25 +205,25 @@ def provision_vm(
 
         item = Items()
         item.key = "group_name"
-        item.value = group["group_name"]
+        item.value = group.group_name
         l.append(item)
 
         item = Items()
         item.key = "inventory_groups"
-        item.value = json.dumps(group["inventory_groups"] + [cluster_name])
+        item.value = json.dumps(group.inventory_groups + [cluster_name])
         l.append(item)
 
         item = Items()
         item.key = "extra_vars"
-        item.value = json.dumps(group.get("extra_vars", {}))
+        item.value = json.dumps(group.extra_vars)
         l.append(item)
 
         tags.items = l
 
         network_interface = NetworkInterface()
-        network_interface.name = group["subnet"]
+        network_interface.name = group.subnet
 
-        if group["public_ip"]:
+        if group.public_ip:
             access = AccessConfig()
             access.type_ = AccessConfig.Type.ONE_TO_ONE_NAT.name
             access.name = "External NAT"
@@ -248,7 +244,7 @@ def provision_vm(
         instance.labels = {"deployment_id": deployment_id}
 
         t = Tags()
-        t.items = group["security_groups"]
+        t.items = group.security_groups
         instance.tags = t
 
         instance.network_interfaces = [network_interface]
@@ -265,16 +261,14 @@ def provision_vm(
             project=gcp_project, zone=gcpzone, instance=instance_name
         )
 
-        update_new_deployment(
-            [parse_instance(instance, group["region"], group["zone"]).to_dict()]
-        )
+        update_new_deployment([parse_instance(instance, group.region, group.zone)])
 
     except Exception as e:
         update_errors(e)
 
 
-def terminate_vm(instance: dict, update_errors):
-    logger.debug(f"--gcp {instance['id']}")
+def terminate_vm(instance: CloudInstance, update_errors):
+    logger.debug(f"--gcp {instance.id}")
 
     gcp_project = os.getenv("GCP_PROJECT")
     if not gcp_project:
@@ -285,33 +279,33 @@ def terminate_vm(instance: dict, update_errors):
 
         instance_client.delete(
             project=gcp_project,
-            zone=f"{instance['region']}-{instance['zone']}",
-            instance=instance["id"],
+            zone=f"{instance.region}-{instance.zone}",
+            instance=instance.id,
         )
         logger.info(f"Deleting GCP instance: {instance}")
 
         client = AddressesClient()
         client.delete(
             project=gcp_project,
-            region=instance["region"],
-            address=f"{instance['id']}-eip",
+            region=instance.region,
+            address=f"{instance.id}-eip",
         )
 
-        logger.info(f"GCP External IP address {instance['id']} released successfully.")
+        logger.info(f"GCP External IP address {instance.id} released successfully.")
 
     except Exception as e:
         update_errors(e)
 
 
-def modify_vm(instance: dict, new_cpus_count: int, get_instance_type, update_errors):
-    instance_id = instance["id"]
+def modify_vm(instance: CloudInstance, new_cpus_count: int, get_instance_type, update_errors):
+    instance_id = instance.id
 
     gcp_project = os.getenv("GCP_PROJECT")
     if not gcp_project:
         update_errors("GCP_PROJECT env var is not defined")
         return
 
-    gcpzone = f"{instance['region']}-{instance['zone']}"
+    gcpzone = f"{instance.region}-{instance.zone}"
 
     try:
         client = InstancesClient()
@@ -323,12 +317,7 @@ def modify_vm(instance: dict, new_cpus_count: int, get_instance_type, update_err
         logger.info(f"Stopped {instance_id}")
 
         new_instance_type = get_instance_type(
-            {
-                "cloud": instance["cloud"],
-                "instance": {
-                    "cpu": new_cpus_count,
-                },
-            }
+            Group(cloud=instance.cloud, instance=InstanceSpec(cpu=new_cpus_count))
         )
 
         req = InstancesSetMachineTypeRequest(
@@ -351,15 +340,15 @@ def modify_vm(instance: dict, new_cpus_count: int, get_instance_type, update_err
         update_errors(e)
 
 
-def resize_vm(instance: dict, new_disk_size: int, update_errors):
-    instance_id = instance["id"]
+def resize_vm(instance: CloudInstance, new_disk_size: int, update_errors):
+    instance_id = instance.id
 
     gcp_project = os.getenv("GCP_PROJECT")
     if not gcp_project:
         update_errors("GCP_PROJECT env var is not defined")
         return
 
-    gcpzone = f"{instance['region']}-{instance['zone']}"
+    gcpzone = f"{instance.region}-{instance.zone}"
 
     try:
         client = InstancesClient()

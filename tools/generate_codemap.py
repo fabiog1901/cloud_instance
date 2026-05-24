@@ -33,8 +33,8 @@ AGENT_RULES = [
     "Keep deployment schema changes in `cloud_instance/models.py`.",
     "Keep reconciliation/provider-neutral planning in `cloud_instance/core/build.py`.",
     "Keep provider-specific create/fetch/parse/delete behavior in `cloud_instance/providers/`.",
-    "Preserve the common instance dict shape returned by parsers unless every caller is updated together.",
-    "Deployment models may validate and normalize input, but provider code currently consumes plain dicts.",
+    "Provider parsers should return `CloudInstance`; collections should be plain `list[CloudInstance]`.",
+    "Deployment models validate and normalize input before command/core/provider code consumes it.",
 ]
 
 

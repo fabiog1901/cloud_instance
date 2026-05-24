@@ -1,23 +1,24 @@
 import logging
+import os
 from threading import Lock, Thread
 
-from ..models import IPAddressType
+from ..models import CloudInstance, Group, InstanceDefaults, ProvisionTask, ProvisionTasks
 from ..providers.aws import provision_vm as provision_aws
 from ..providers.azure import provision_vm as provision_azure
 from ..providers.gcp import provision_vm as provision_gcp
 
 logger = logging.getLogger("cloud_instance")
 
-instances: list[dict] = []
+instances: list[CloudInstance] = []
 errors: list[str] = []
-defaults: dict = {}
+defaults = InstanceDefaults()
 
 
-def update_new_deployment(_instances: list):
+def update_new_deployment(new_instances: list[CloudInstance]):
     global instances
     with Lock():
         logger.debug("Updating pre-existing instances list")
-        instances += _instances
+        instances.extend(new_instances)
 
 
 def update_errors(error: str):
@@ -27,34 +28,46 @@ def update_errors(error: str):
         errors.append(error)
 
 
-def get_instance_type(group: dict):
-    if "instance_type" in group:
-        return group["instance_type"]
+def get_instance_type(group: Group):
+    if group.instance_type:
+        return group.instance_type
 
-    cpu = str(group["instance"].get("cpu"))
-    if cpu == "None":
+    cpu = group.instance.cpu if group.instance else None
+    if cpu is None:
         update_errors("instance cpu cannot be null")
         return
 
-    mem = str(group["instance"].get("mem", "default"))
-    cloud = group["cloud"]
+    mem = group.instance.mem if group.instance else None
     global defaults
 
-    return defaults[cloud][cpu][mem]
+    return defaults.instance_type(group.cloud, cpu, mem)
 
 
-def provision(new_vms: list[Thread], instance_defaults) -> list[dict]:
+def provision(
+    new_vms: ProvisionTasks, instance_defaults: InstanceDefaults
+) -> list[CloudInstance]:
     global defaults
-    defaults = instance_defaults
-
-    for x in new_vms:
-        x.start()
-
-    for x in new_vms:
-        x.join()
-
     global instances
     global errors
+    defaults = instance_defaults
+    instances = []
+    errors = []
+
+    threads = []
+    for task in new_vms:
+        thread = Thread(
+            target={
+                "aws": provision_aws_vm,
+                "gcp": provision_gcp_vm,
+                "azure": provision_azure_vm,
+            }.get(task.group.cloud),
+            args=(task,),
+        )
+        thread.start()
+        threads.append(thread)
+
+    for x in threads:
+        x.join()
 
     if errors:
         raise ValueError("Failed to provision instances.")
@@ -62,58 +75,39 @@ def provision(new_vms: list[Thread], instance_defaults) -> list[dict]:
     return instances
 
 
-def provision_aws_vm(
-    deployment_id: str,
-    cluster_name: str,
-    group: dict,
-    x: int,
-):
+def provision_aws_vm(task: ProvisionTask):
     provision_aws(
-        deployment_id,
-        cluster_name,
-        group,
-        x,
+        task.deployment_id,
+        task.cluster_name,
+        task.group,
+        task.index,
         get_instance_type,
         update_new_deployment,
         update_errors,
     )
 
 
-def provision_gcp_vm(
-    deployment_id: str,
-    cluster_name: str,
-    group: dict,
-    x: int,
-    ip_address_type: IPAddressType = IPAddressType.IPv4_EPHEMERAL,
-):
+def provision_gcp_vm(task: ProvisionTask):
     provision_gcp(
-        deployment_id,
-        cluster_name,
-        group,
-        x,
+        task.deployment_id,
+        task.cluster_name,
+        task.group,
+        task.index,
         get_instance_type,
         update_new_deployment,
         update_errors,
-        ip_address_type,
     )
 
 
-def provision_azure_vm(
-    deployment_id: str,
-    cluster_name: str,
-    group: dict,
-    x: int,
-    azure_subscription_id,
-    azure_resource_group,
-):
+def provision_azure_vm(task: ProvisionTask):
     provision_azure(
-        deployment_id,
-        cluster_name,
-        group,
-        x,
+        task.deployment_id,
+        task.cluster_name,
+        task.group,
+        task.index,
         get_instance_type,
         update_new_deployment,
         update_errors,
-        azure_subscription_id,
-        azure_resource_group,
+        os.getenv("AZURE_SUBSCRIPTION_ID"),
+        os.getenv("AZURE_RESOURCE_GROUP"),
     )

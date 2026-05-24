@@ -32,7 +32,7 @@ class CloudInstance:
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, value: dict[str, Any]) -> "CloudInstance":
+    def from_dict(cls, value: Any) -> "CloudInstance":
         data = _require_mapping(value, "instance")
         return cls(
             id=data.pop("id"),
@@ -83,6 +83,36 @@ class CloudInstance:
 
 
 @dataclass(slots=True)
+class InstanceDefaults:
+    values: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, value: Any) -> "InstanceDefaults":
+        return cls(_require_mapping(value, "defaults"))
+
+    def instance_type(self, cloud: str, cpu: int | str | None, mem: int | str | None = None):
+        cpu_key = str(cpu)
+        mem_key = str(mem or "default")
+        return self.values[cloud][cpu_key][mem_key]
+
+
+@dataclass(slots=True)
+class GroupFilter:
+    groups: tuple[str, ...] = ()
+
+    @classmethod
+    def from_csv(cls, value: str | None) -> "GroupFilter":
+        if not value:
+            return cls()
+        return cls(tuple(x for x in value.split(",") if x))
+
+    def matches(self, instance: CloudInstance) -> bool:
+        if not self.groups:
+            return True
+        return set(self.groups).issubset(set(instance.inventory_groups))
+
+
+@dataclass(slots=True)
 class InstanceSpec:
     cpu: int | str | None = None
     mem: int | str | None = None
@@ -90,7 +120,7 @@ class InstanceSpec:
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, value: dict[str, Any] | None) -> "InstanceSpec | None":
+    def from_dict(cls, value: Any) -> "InstanceSpec | None":
         if value is None:
             return None
         data = _require_mapping(value, "instance")
@@ -122,7 +152,7 @@ class Volume:
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, value: dict[str, Any]) -> "Volume":
+    def from_dict(cls, value: Any) -> "Volume":
         data = _require_mapping(value, "volume")
         return cls(
             size=data.pop("size", None),
@@ -153,7 +183,7 @@ class Volumes:
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, value: dict[str, Any] | None) -> "Volumes | None":
+    def from_dict(cls, value: Any) -> "Volumes | None":
         if value is None:
             return None
         data = _require_mapping(value, "volumes")
@@ -200,7 +230,7 @@ class Group:
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, value: dict[str, Any]) -> "Group":
+    def from_dict(cls, value: Any) -> "Group":
         data = _require_mapping(value, "group")
         return cls(
             cloud=data.pop("cloud", None),
@@ -282,7 +312,7 @@ class Cluster:
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, value: dict[str, Any]) -> "Cluster":
+    def from_dict(cls, value: Any) -> "Cluster":
         data = _require_mapping(value, "cluster")
         return cls(
             cluster_name=data.pop("cluster_name", None),
@@ -336,7 +366,7 @@ class Deployment:
     clusters: list[Cluster] = field(default_factory=list)
 
     @classmethod
-    def from_list(cls, value: list[dict[str, Any]]) -> "Deployment":
+    def from_list(cls, value: Any) -> "Deployment":
         return cls(
             clusters=[
                 Cluster.from_dict(x)
@@ -346,6 +376,38 @@ class Deployment:
 
     def to_list(self) -> list[dict[str, Any]]:
         return [x.to_dict() for x in self.clusters]
+
+
+@dataclass(slots=True)
+class ProvisionTask:
+    deployment_id: str
+    cluster_name: str
+    group: Group
+    index: int
+
+
+@dataclass(slots=True)
+class ProvisionTasks:
+    items: list[ProvisionTask] = field(default_factory=list)
+
+    def append(self, task: ProvisionTask) -> None:
+        self.items.append(task)
+
+    def extend(self, tasks: "ProvisionTasks") -> None:
+        self.items.extend(tasks.items)
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def __len__(self) -> int:
+        return len(self.items)
+
+
+@dataclass(slots=True)
+class BuildResult:
+    current_vms: list[CloudInstance] = field(default_factory=list)
+    surplus_vms: list[CloudInstance] = field(default_factory=list)
+    new_vms: ProvisionTasks = field(default_factory=ProvisionTasks)
 
 
 def _require_mapping(value: Any, name: str) -> dict[str, Any]:

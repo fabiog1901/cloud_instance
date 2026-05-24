@@ -1,6 +1,7 @@
 import logging
 from threading import Lock, Thread
 
+from ..models import CloudInstance
 from ..providers.aws import terminate_vm as terminate_aws_vm
 from ..providers.azure import terminate_vm as terminate_azure_vm
 from ..providers.gcp import terminate_vm as terminate_gcp_vm
@@ -10,7 +11,7 @@ logger = logging.getLogger("cloud_instance")
 errors: list[str] = []
 
 
-def terminate(instances: list[dict]) -> None:
+def terminate(instances: list[CloudInstance]) -> None:
     threads: list[Thread] = []
 
     for x in instances:
@@ -19,7 +20,7 @@ def terminate(instances: list[dict]) -> None:
                 "aws": terminate_aws_vm,
                 "gcp": terminate_gcp_vm,
                 "azure": terminate_azure_vm,
-            }.get(x["cloud"]),
+            }.get(x.cloud),
             args=(x, update_errors),
         )
         thread.start()

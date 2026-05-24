@@ -3,17 +3,18 @@ import json
 import logging
 import time
 from threading import Thread
+from typing import Any
 
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ConnectTimeoutError, ReadTimeoutError, SSLError
 
-from ..models import CloudInstance, IPAddressType
+from ..models import CloudInstance, Group, IPAddressType, InstanceSpec
 
 logger = logging.getLogger("cloud_instance")
 
 
-def first_ipv6_address(instance: dict):
+def first_ipv6_address(instance: Any):
     for interface in instance.get("NetworkInterfaces", []):
         for address in interface.get("Ipv6Addresses", []):
             if address.get("Ipv6Address"):
@@ -21,7 +22,7 @@ def first_ipv6_address(instance: dict):
     return None
 
 
-def parse_instances(ec2_response: dict):
+def parse_instances(ec2_response: Any) -> list[CloudInstance]:
     instances: list[CloudInstance] = []
 
     for x in ec2_response["Reservations"]:
@@ -86,7 +87,7 @@ def fetch_instances(deployment_id: str, update_instances_list, update_errors):
                 ]
             )
 
-            aws_instances = [x.to_dict() for x in parse_instances(response)]
+            aws_instances = parse_instances(response)
 
             if aws_instances:
                 update_instances_list(aws_instances)
@@ -129,13 +130,13 @@ def fetch_instances(deployment_id: str, update_instances_list, update_errors):
 def provision_vm(
     deployment_id: str,
     cluster_name: str,
-    group: dict,
+    group: Group,
     x: int,
     get_instance_type,
     update_new_deployment,
     update_errors,
 ):
-    logger.debug("++aws %s %s %s" % (cluster_name, group["region"], x))
+    logger.debug("++aws %s %s %s" % (cluster_name, group.region, x))
     allocation_id = None
     eip_associated = False
     ec2 = None
@@ -143,10 +144,10 @@ def provision_vm(
     def get_ip_address_type(x):
         try:
             return IPAddressType(
-                x.get("ip_address_type", IPAddressType.IPv4_EPHEMERAL.value)
+                x.ip_address_type or IPAddressType.IPv4_EPHEMERAL
             )
         except ValueError:
-            raise ValueError(f"Invalid ip_address_type: {x['ip_address_type']}") from None
+            raise ValueError(f"Invalid ip_address_type: {x.ip_address_type}") from None
 
     def get_type(x):
         return {
@@ -158,7 +159,7 @@ def provision_vm(
         }.get(x, "gp3")
 
     try:
-        vols = [group["volumes"]["os"]] + group["volumes"]["data"]
+        vols = [group.volumes.os] + group.volumes.data
         ip_address_type = get_ip_address_type(group)
 
         bdm = []
@@ -167,77 +168,81 @@ def provision_vm(
             dev = {
                 "DeviceName": "/dev/sd" + (chr(ord("e") + i)),
                 "Ebs": {
-                    "VolumeSize": int(x.get("size", 100)),
-                    "VolumeType": get_type(x.get("type", "standard_ssd")),
-                    "DeleteOnTermination": bool(x.get("delete_on_termination", True)),
+                    "VolumeSize": int(x.size or 100),
+                    "VolumeType": get_type(x.type or "standard_ssd"),
+                    "DeleteOnTermination": bool(
+                        x.delete_on_termination
+                        if x.delete_on_termination is not None
+                        else True
+                    ),
                 },
             }
 
-            if x.get("type", "standard_ssd") in ["premium_ssd", "standard_ssd"]:
-                dev["Ebs"]["Iops"] = int(x.get("iops", 3000))
+            if (x.type or "standard_ssd") in ["premium_ssd", "standard_ssd"]:
+                dev["Ebs"]["Iops"] = int(x.iops or 3000)
 
             if (
-                x.get("throughput", False)
-                and x.get("type", "standard_ssd") == "standard_ssd"
+                x.throughput
+                and (x.type or "standard_ssd") == "standard_ssd"
             ):
-                dev["Ebs"]["Throughput"] = x.get("throughput", 125)
+                dev["Ebs"]["Throughput"] = x.throughput or 125
 
             bdm.append(dev)
 
         bdm[0]["DeviceName"] = "/dev/sda1"
 
-        tags = [{"Key": k, "Value": v} for k, v in group["tags"].items()]
+        tags = [{"Key": k, "Value": v} for k, v in group.tags.items()]
         tags.append({"Key": "deployment_id", "Value": deployment_id})
-        tags.append({"Key": "ansible_user", "Value": group["user"]})
+        tags.append({"Key": "ansible_user", "Value": group.user})
         tags.append({"Key": "cluster_name", "Value": cluster_name})
-        tags.append({"Key": "group_name", "Value": group["group_name"]})
+        tags.append({"Key": "group_name", "Value": group.group_name})
         tags.append(
             {
                 "Key": "inventory_groups",
-                "Value": json.dumps(group["inventory_groups"] + [cluster_name]),
+                "Value": json.dumps(group.inventory_groups + [cluster_name]),
             }
         )
         tags.append(
-            {"Key": "extra_vars", "Value": json.dumps(group.get("extra_vars", {}))}
+            {"Key": "extra_vars", "Value": json.dumps(group.extra_vars)}
         )
         tags.append({"Key": "ip_address_type", "Value": ip_address_type.value})
 
-        if group.get("role", None):
-            role = {"Name": group["role"]}
+        if group.role:
+            role = {"Name": group.role}
         else:
             role = {}
 
-        arch = group.get("instance", {}).get("arch", "amd64")
+        arch = group.instance.arch if group.instance and group.instance.arch else "amd64"
 
-        image_id = boto3.client("ssm", region_name=group["region"]).get_parameter(
-            Name=f"/aws/service{group['image']}/stable/current/{arch}/hvm/ebs-gp3/ami-id"
+        image_id = boto3.client("ssm", region_name=group.region).get_parameter(
+            Name=f"/aws/service{group.image}/stable/current/{arch}/hvm/ebs-gp3/ami-id"
         )["Parameter"]["Value"]
 
-        ec2 = boto3.client("ec2", region_name=group["region"])
+        ec2 = boto3.client("ec2", region_name=group.region)
 
         network_interface = {
-            "Groups": group["security_groups"],
+            "Groups": group.security_groups,
             "DeviceIndex": 0,
-            "SubnetId": group["subnet"],
+            "SubnetId": group.subnet,
         }
 
-        if group["public_ip"] and ip_address_type == IPAddressType.IPv6:
+        if group.public_ip and ip_address_type == IPAddressType.IPv6:
             network_interface["AssociatePublicIpAddress"] = False
             network_interface["Ipv6AddressCount"] = 1
-        elif group["public_ip"] and ip_address_type == IPAddressType.IPv4_RESERVED:
+        elif group.public_ip and ip_address_type == IPAddressType.IPv4_RESERVED:
             network_interface["AssociatePublicIpAddress"] = False
         else:
-            network_interface["AssociatePublicIpAddress"] = group["public_ip"]
+            network_interface["AssociatePublicIpAddress"] = group.public_ip
 
         response = ec2.run_instances(
             DryRun=False,
             BlockDeviceMappings=bdm,
             ImageId=image_id,
             InstanceType=get_instance_type(group),
-            KeyName=group["public_key_id"],
+            KeyName=group.public_key_id,
             MaxCount=1,
             MinCount=1,
-            UserData=group.get("user_data", ""),
+            UserData=group.user_data or "",
             IamInstanceProfile=role,
             NetworkInterfaces=[network_interface],
             TagSpecifications=[
@@ -251,7 +256,7 @@ def provision_vm(
         waiter = ec2.get_waiter("instance_running")
         waiter.wait(InstanceIds=[response["Instances"][0]["InstanceId"]])
 
-        if group["public_ip"] and ip_address_type == IPAddressType.IPv4_RESERVED:
+        if group.public_ip and ip_address_type == IPAddressType.IPv4_RESERVED:
             allocation = ec2.allocate_address(
                 Domain="vpc",
                 TagSpecifications=[
@@ -272,7 +277,7 @@ def provision_vm(
             InstanceIds=[response["Instances"][0]["InstanceId"]]
         )
 
-        update_new_deployment([x.to_dict() for x in parse_instances(response)])
+        update_new_deployment(parse_instances(response))
     except Exception as e:
         if ec2 and allocation_id and not eip_associated:
             try:
@@ -282,7 +287,7 @@ def provision_vm(
         update_errors(e)
 
 
-def terminate_vm(instance: dict, update_errors):
+def terminate_vm(instance: CloudInstance, update_errors):
     def get_allocation_id(instance_id):
         response = ec2.describe_addresses(
             Filters=[
@@ -319,28 +324,28 @@ def terminate_vm(instance: dict, update_errors):
         except (TypeError, ValueError):
             return False
 
-    logger.info(f"--aws {instance['id']}")
+    logger.info(f"--aws {instance.id}")
 
     try:
-        ec2 = boto3.client("ec2", region_name=instance["region"])
+        ec2 = boto3.client("ec2", region_name=instance.region)
 
         alloc = None
-        if instance.get("ip_address_type") == IPAddressType.IPv4_RESERVED.value:
-            alloc = get_allocation_id(instance["id"])
-        elif is_ipv4_address(instance.get("public_ip")):
-            alloc = get_allocation_id_by_public_ip(instance["public_ip"], instance["id"])
+        if instance.ip_address_type == IPAddressType.IPv4_RESERVED:
+            alloc = get_allocation_id(instance.id)
+        elif is_ipv4_address(instance.public_ip):
+            alloc = get_allocation_id_by_public_ip(instance.public_ip, instance.id)
 
         response = ec2.terminate_instances(
-            InstanceIds=[instance["id"]],
+            InstanceIds=[instance.id],
         )
 
         waiter = ec2.get_waiter("instance_terminated")
-        waiter.wait(InstanceIds=[instance["id"]])
+        waiter.wait(InstanceIds=[instance.id])
 
         status = response["TerminatingInstances"][0]["CurrentState"]["Name"]
 
         if status in ["shutting-down", "terminated"]:
-            logger.info(f"Deleted AWS instance: {instance['id']}")
+            logger.info(f"Deleted AWS instance: {instance.id}")
         else:
             logger.error(f"Unexpected response: {response}")
             update_errors(str(response))
@@ -352,11 +357,11 @@ def terminate_vm(instance: dict, update_errors):
         update_errors(str(e))
 
 
-def modify_vm(instance: dict, new_cpus_count, get_instance_type, update_errors):
-    instance_id = instance["id"]
+def modify_vm(instance: CloudInstance, new_cpus_count, get_instance_type, update_errors):
+    instance_id = instance.id
 
     try:
-        client = boto3.client("ec2", region_name=instance["region"])
+        client = boto3.client("ec2", region_name=instance.region)
 
         logger.info(f"Modifying {instance_id=} {new_cpus_count=}")
 
@@ -366,12 +371,7 @@ def modify_vm(instance: dict, new_cpus_count, get_instance_type, update_errors):
         logger.info(f"Stopped {instance_id}")
 
         new_instance_type = get_instance_type(
-            {
-                "cloud": instance["cloud"],
-                "instance": {
-                    "cpu": new_cpus_count,
-                },
-            }
+            Group(cloud=instance.cloud, instance=InstanceSpec(cpu=new_cpus_count))
         )
 
         client.modify_instance_attribute(
@@ -390,10 +390,10 @@ def modify_vm(instance: dict, new_cpus_count, get_instance_type, update_errors):
         update_errors(e)
 
 
-def resize_vm(instance: dict, new_disk_size, update_errors):
-    instance_id = instance["id"]
+def resize_vm(instance: CloudInstance, new_disk_size, update_errors):
+    instance_id = instance.id
 
-    client = boto3.client("ec2", region_name=instance["region"])
+    client = boto3.client("ec2", region_name=instance.region)
 
     def get_volume_id(instance_id: str) -> str:
         resp = client.describe_instances(InstanceIds=[instance_id])
@@ -424,7 +424,7 @@ def resize_vm(instance: dict, new_disk_size, update_errors):
         logger.info(f"Resize {instance_id=} {new_disk_size=}")
 
         vol_id = get_volume_id(instance_id)
-        vol = boto3.client("ec2", region_name=instance["region"]).describe_volumes(
+        vol = boto3.client("ec2", region_name=instance.region).describe_volumes(
             VolumeIds=[vol_id]
         )["Volumes"][0]
         current_size = vol["Size"]

@@ -1,173 +1,139 @@
 import logging
-from threading import Lock, Thread
 
-from .provision import provision_aws_vm, provision_azure_vm, provision_gcp_vm
+from ..models import (
+    BuildResult,
+    CloudInstance,
+    Cluster,
+    Deployment,
+    Group,
+    ProvisionTask,
+    ProvisionTasks,
+)
 
 logger = logging.getLogger("cloud_instance")
 
-current_instances: list[dict] = []
+current_instances: list[CloudInstance] = []
 
 
 def build(
     deployment_id: str,
-    deployment: list[dict],
-    _current_instances: list[dict],
-):
-    # 4. loop through the 'deployment' struct
-    #    - through each cluster and copies
-    #    - through each group within each cluster
-    new_vms = []
-    surplus_vms = []
-    current_vms = []
-
+    deployment: Deployment,
+    fetched_instances: list[CloudInstance],
+) -> BuildResult:
     global current_instances
-    current_instances = _current_instances
+    current_instances = list(fetched_instances)
 
-    # loop through each cluster item in the deployment list
-    for cluster in deployment:
-        # extract the cluster name for all copies,
-        # then, for each requested copy, add the index suffix
-        cluster_name: str = cluster.get("cluster_name", deployment_id)
-        for x in range(int(cluster.get("copies", 1))):
-            _current_vms, _surplus_vms, _new_vms = build_cluster(
+    result = BuildResult()
+
+    for cluster in deployment.clusters:
+        cluster_name = cluster.cluster_name or deployment_id
+        copies = int(cluster.copies or 1)
+        for x in range(copies):
+            cluster_result = build_cluster(
                 f"{cluster_name}-{x}",
                 cluster,
                 deployment_id,
             )
-            new_vms += _new_vms
-            surplus_vms += _surplus_vms
-            current_vms += _current_vms
+            result.current_vms.extend(cluster_result.current_vms)
+            result.surplus_vms.extend(cluster_result.surplus_vms)
+            result.new_vms.extend(cluster_result.new_vms)
 
-    return current_vms, surplus_vms + current_instances, new_vms
+    result.surplus_vms.extend(current_instances)
+    return result
 
 
 def build_cluster(
     cluster_name: str,
-    cluster: dict,
-    deployment_id,
-):
-    # for each group in the cluster,
-    # put all cluster defaults into the group
-    new_vms = []
-    surplus_vms = []
-    current_vms = []
+    cluster: Cluster,
+    deployment_id: str,
+) -> BuildResult:
+    result = BuildResult()
 
-    for group in cluster.get("groups", []):
-        _current_vms, _surplus_vms, _new_vms = build_group(
+    for group in cluster.groups:
+        group_result = build_group(
             cluster_name,
-            merge_dicts(cluster, group),
+            merge_cluster_group(cluster, group),
             deployment_id,
         )
-        new_vms += _new_vms
-        surplus_vms += _surplus_vms
-        current_vms += _current_vms
+        result.current_vms.extend(group_result.current_vms)
+        result.surplus_vms.extend(group_result.surplus_vms)
+        result.new_vms.extend(group_result.new_vms)
 
-    return current_vms, surplus_vms, new_vms
+    return result
 
 
 def build_group(
     cluster_name: str,
-    group: dict,
-    deployment_id,
-):
-    # for each group, compare what is in 'deployment' to what is in 'current_deployment':
-    #     case NO DIFFERENCE
-    #       return the details in current_deployment
-    #
-    #     case TOO FEW
-    #       for each exact count, start a thread to create the requested instance
-    #       return current_deployment + the details of the newly created instances
-    #
-    #     case TOO MANY
-    #        for each instance that's too many, start a thread to destroy the instance
-    #        return current_deployment minus what was distroyed
-
-    # get all instances in the current group
-    current_group = []
-    new_vms = []
-    surplus_vms = []
+    group: Group,
+    deployment_id: str,
+) -> BuildResult:
+    result = BuildResult()
 
     global current_instances
 
-    for x in current_instances.copy():
-        if (
-            x["cluster_name"] == cluster_name
-            and x["group_name"] == group["group_name"]
-            and x["region"] == group["region"]
-            and x["zone"] == group["zone"]
-        ):
-            current_group.append(x)
-            current_instances.remove(x)
+    for instance in list(current_instances):
+        if matches_group(instance, cluster_name, group):
+            result.current_vms.append(instance)
+            current_instances.remove(instance)
 
-    current_count = len(current_group)
-    new_exact_count = int(group.get("exact_count", 0))
+    current_count = len(result.current_vms)
+    new_exact_count = int(group.exact_count or 0)
 
-    # ADD instances
     if current_count < new_exact_count:
         for x in range(new_exact_count - current_count):
-            target = {
-                "aws": provision_aws_vm,
-                "gcp": provision_gcp_vm,
-                "azure": provision_azure_vm,
-            }.get(group["cloud"])
-
-            args = (deployment_id, cluster_name, group, x)
-
-            new_vms.append(
-                Thread(
-                    target=target,
-                    args=args,
+            result.new_vms.append(
+                ProvisionTask(
+                    deployment_id=deployment_id,
+                    cluster_name=cluster_name,
+                    group=group,
+                    index=x,
                 )
             )
-
-    # REMOVE instances
     elif current_count > new_exact_count:
         for x in range(current_count - new_exact_count):
-            surplus_vms.append(current_group.pop(-1))
+            result.surplus_vms.append(result.current_vms.pop(-1))
 
-    return current_group, surplus_vms, new_vms
+    return result
 
 
-def merge_dicts(parent: dict, child: dict):
+def matches_group(instance: CloudInstance, cluster_name: str, group: Group) -> bool:
+    return (
+        instance.cluster_name == cluster_name
+        and instance.group_name == group.group_name
+        and instance.region == group.region
+        and instance.zone == group.zone
+    )
+
+
+def merge_cluster_group(parent: Cluster, child: Group) -> Group:
+    parent_data = parent.to_dict()
+    child_data = child.to_dict()
     merged = {}
 
-    # add all kv pairs of 'import'
-    for k, v in parent.get("import", {}).items():
+    for k, v in parent_data.get("import", {}).items():
         merged[k] = v
 
-    # parent explicit override parent imports
-    for k, v in parent.items():
+    for k, v in parent_data.items():
         merged[k] = v
 
-    # child imports override parent
-    for k, v in child.get("import", {}).items():
+    for k, v in child_data.get("import", {}).items():
         merged[k] = v
 
-    # child explicit override child import and parent
-    for k, v in child.items():
+    for k, v in child_data.items():
         merged[k] = v
 
-    # merge the items in tags, child overrides parent
-    tags_dict = parent.get("tags", {})
-    for k, v in child.get("tags", {}).items():
-        tags_dict[k] = v
+    tags = parent_data.get("tags", {})
+    tags.update(child_data.get("tags", {}))
+    merged["tags"] = tags
 
-    merged["tags"] = tags_dict
-
-    # aggregate the inventory groups
     merged["inventory_groups"] = list(
-        set(parent.get("inventory_groups", []) + merged.get("inventory_groups", []))
+        set(parent_data.get("inventory_groups", []) + merged.get("inventory_groups", []))
     )
 
-    # aggregate the security groups
     merged["security_groups"] = list(
-        set(parent.get("security_groups", []) + merged.get("security_groups", []))
+        set(parent_data.get("security_groups", []) + merged.get("security_groups", []))
     )
 
-    # group_name
     merged.setdefault("group_name", sorted(merged["inventory_groups"])[0])
 
-    # aggregate the volumes
-    # TODO
-
-    return merged
+    return Group.from_dict(merged)

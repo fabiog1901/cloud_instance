@@ -13,6 +13,7 @@ from .commands.resize import resize
 from .commands.slated import slated
 
 from . import __version__
+from .models import CloudInstance, Deployment, GroupFilter, InstanceDefaults
 
 EPILOG = "Docs: <https://github.com/fabiog1901/cloud_instance>"
 
@@ -43,6 +44,10 @@ app = typer.Typer(
 )
 
 version: bool = typer.Option(True)
+
+
+def instances_to_json(instances: list[CloudInstance]) -> str:
+    return json.dumps([x.to_dict() for x in instances])
 
 
 @app.command(
@@ -78,15 +83,15 @@ def cli_create(
     try:
         result = create(
             deployment_id,
-            json.loads(deployment),
-            json.loads(defaults),
+            Deployment.from_list(json.loads(deployment)),
+            InstanceDefaults.from_dict(json.loads(defaults)),
             preserve,
         )
     except Exception as e:
         print(e, file=sys.stderr)
         sys.exit(1)
 
-    print(json.dumps(result))
+    print(instances_to_json(result))
 
     logger.info(f"COMPLETED: create {deployment_id=}")
 
@@ -113,7 +118,7 @@ def cli_gather(
         print(e, file=sys.stderr)
         sys.exit(1)
 
-    print(json.dumps(result))
+    print(instances_to_json(result))
 
     logger.info(f"COMPLETED: gather {deployment_id=}")
 
@@ -141,13 +146,13 @@ def cli_slated(
     try:
         result = slated(
             deployment_id,
-            json.loads(deployment),
+            Deployment.from_list(json.loads(deployment)),
         )
     except Exception as e:
         print(e, file=sys.stderr)
         sys.exit(1)
 
-    print(json.dumps(result))
+    print(instances_to_json(result))
 
     logger.info(f"COMPLETED: slated {deployment_id=}")
 
@@ -199,10 +204,10 @@ def cli_modify(
     modify(
         deployment_id,
         new_cpus_count,
-        filter_by_groups.split(",") if filter_by_groups else [],
+        GroupFilter.from_csv(filter_by_groups),
         sequential,
         pause_between,
-        json.loads(defaults),
+        InstanceDefaults.from_dict(json.loads(defaults)),
     )
 
     logger.info(f"COMPLETED: modify {deployment_id=}")
@@ -251,7 +256,7 @@ def cli_resize(
     resize(
         deployment_id,
         new_disk_size,
-        filter_by_groups.split(",") if filter_by_groups else [],
+        GroupFilter.from_csv(filter_by_groups),
         sequential,
         pause_between,
     )

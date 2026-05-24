@@ -4,11 +4,12 @@ import logging
 logger = logging.getLogger("cloud_instance")
 
 from ..core.fetch import fetch
+from ..models import CloudInstance
 
 
 def gather(
     deployment_id: str,
-) -> list[dict]:
+) -> list[CloudInstance]:
 
     logger.info(f"Fetching all instances with {deployment_id=}")
 

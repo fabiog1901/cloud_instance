@@ -2,15 +2,16 @@ import logging
 import time
 from threading import Lock, Thread
 
+from ..core.fetch import fetch
+from ..models import CloudInstance, Group, GroupFilter, InstanceDefaults
 from ..providers.aws import modify_vm as modify_aws_vm
 from ..providers.azure import modify_vm as modify_azure_vm
 from ..providers.gcp import modify_vm as modify_gcp_vm
-from ..core.fetch import fetch
 
 logger = logging.getLogger("cloud_instance")
 
 errors: list[str] = []
-defaults: dict = {}
+defaults = InstanceDefaults()
 
 
 def update_errors(error: str):
@@ -20,29 +21,28 @@ def update_errors(error: str):
         errors.append(error)
 
 
-def get_instance_type(group: dict):
-    if "instance_type" in group:
-        return group["instance_type"]
+def get_instance_type(group: Group):
+    if group.instance_type:
+        return group.instance_type
 
-    cpu = str(group["instance"].get("cpu"))
-    if cpu == "None":
+    cpu = group.instance.cpu if group.instance else None
+    if cpu is None:
         update_errors("instance cpu cannot be null")
         return
 
-    mem = str(group["instance"].get("mem", "default"))
-    cloud = group["cloud"]
+    mem = group.instance.mem if group.instance else None
     global defaults
 
-    return defaults[cloud][cpu][mem]
+    return defaults.instance_type(group.cloud, cpu, mem)
 
 
 def modify(
     deployment_id: str,
     new_cpus_count: int,
-    filter_by_groups: list[str] = [],
+    filter_by_groups: GroupFilter = GroupFilter(),
     sequential: bool = True,
     pause_between: int = 30,
-    instance_defaults: dict = {},
+    instance_defaults: InstanceDefaults = InstanceDefaults(),
 ) -> None:
     logger.info(f"Fetching all instances with {deployment_id=}")
 
@@ -55,30 +55,25 @@ def modify(
     for idx, x in enumerate(current_instances, start=1):
         logger.info(f"{idx}:\t{x}")
 
-    filtered_instances = []
-
-    for idx, x in enumerate(current_instances, start=1):
-        inv_grps = set(x.get("inventory_groups", []))
-        if (
-            len(filter_by_groups) == 0
-            or inv_grps
-            and set(filter_by_groups).issubset(inv_grps)
-        ):
-            filtered_instances.append(x)
+    filtered_instances = [
+        x for x in current_instances if filter_by_groups.matches(x)
+    ]
 
     global defaults
+    global errors
     defaults = instance_defaults
+    errors = []
 
     if sequential:
         for x in filtered_instances:
-            modify_vm(x, new_cpus_count)
+            modify_instance(x, new_cpus_count)
             logger.info(f"Pausing for {pause_between} seconds...")
             time.sleep(pause_between)
     else:
         threads = []
         for x in filtered_instances:
             t = Thread(
-                target=modify_vm,
+                target=modify_instance,
                 args=(x, new_cpus_count),
             )
             t.start()
@@ -87,15 +82,13 @@ def modify(
         for x in threads:
             x.join()
 
-    global errors
-
     if errors:
         raise ValueError(f"Failed to modify instances for {deployment_id=}")
 
 
-def modify_vm(instance: dict, new_cpus_count: int):
+def modify_instance(instance: CloudInstance, new_cpus_count: int):
     {
         "aws": modify_aws_vm,
         "gcp": modify_gcp_vm,
         "azure": modify_azure_vm,
-    }.get(instance["cloud"])(instance, new_cpus_count, get_instance_type, update_errors)
+    }.get(instance.cloud)(instance, new_cpus_count, get_instance_type, update_errors)

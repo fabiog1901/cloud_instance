@@ -6,12 +6,12 @@ import random
 from azure.identity import EnvironmentCredential
 from azure.mgmt.compute import ComputeManagementClient
 
-from ..models import CloudInstance
+from ..models import CloudInstance, Group
 
 logger = logging.getLogger("cloud_instance")
 
 
-def parse_instance(vm, private_ip, public_ip, public_hostname):
+def parse_instance(vm, private_ip, public_ip, public_hostname) -> list[CloudInstance]:
     return [
         CloudInstance(
             id=vm.name,
@@ -27,14 +27,14 @@ def parse_instance(vm, private_ip, public_ip, public_hostname):
             cluster_name=vm.tags["cluster_name"],
             group_name=vm.tags["group_name"],
             extra_vars=vm.tags["extra_vars"],
-        ).to_dict()
+        )
     ]
 
 
 def provision_vm(
     deployment_id: str,
     cluster_name: str,
-    group: dict,
+    group: Group,
     x: int,
     get_instance_type,
     update_new_deployment,
@@ -42,7 +42,7 @@ def provision_vm(
     azure_subscription_id,
     azure_resource_group,
 ):
-    logger.debug("++azure %s %s %s" % (cluster_name, group["group_name"], x))
+    logger.debug("++azure %s %s %s" % (cluster_name, group.group_name, x))
 
     try:
         credential = EnvironmentCredential()
@@ -61,14 +61,14 @@ def provision_vm(
 
         vols = []
 
-        for i, x in enumerate(group["volumes"]["data"]):
+        for i, x in enumerate(group.volumes.data):
             poller = client.disks.begin_create_or_update(
                 azure_resource_group,
                 instance_name + "-disk-" + str(i),
                 {
-                    "location": group["region"],
-                    "sku": {"name": get_type(x.get("type", "standard_ssd"))},
-                    "disk_size_gb": int(x.get("size", 100)),
+                    "location": group.region,
+                    "sku": {"name": get_type((x.type or "standard_ssd"))},
+                    "disk_size_gb": int((x.size or 100)),
                     "creation_data": {"create_option": "Empty"},
                 },
             )
@@ -80,22 +80,22 @@ def provision_vm(
                 "name": instance_name + "-disk-" + str(i),
                 "create_option": "Attach",
                 "delete_option": (
-                    "Delete" if x.get("delete_on_termination", True) else "Detach"
+                    "Delete" if (x.delete_on_termination if x.delete_on_termination is not None else True) else "Detach"
                 ),
                 "managed_disk": {"id": data_disk.id},
             }
             vols.append(disk)
 
-        publisher, offer, sku, version = group["image"].split(":")
+        publisher, offer, sku, version = group.image.split(":")
 
         nsg = None
-        if group["security_groups"]:
+        if group.security_groups:
             nsg = {
                 "id": "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkSecurityGroups/%s"
                 % (
                     azure_subscription_id,
                     azure_resource_group,
-                    group["security_groups"][0],
+                    group.security_groups[0],
                 )
             }
 
@@ -103,16 +103,16 @@ def provision_vm(
             azure_resource_group,
             instance_name,
             {
-                "location": group["region"],
+                "location": group.region,
                 "tags": {
                     "deployment_id": deployment_id,
-                    "ansible_user": group["user"],
+                    "ansible_user": group.user,
                     "cluster_name": cluster_name,
-                    "group_name": group["group_name"],
+                    "group_name": group.group_name,
                     "inventory_groups": json.dumps(
-                        group["inventory_groups"] + [cluster_name]
+                        group.inventory_groups + [cluster_name]
                     ),
-                    "extra_vars": json.dumps(group.get("extra_vars", {})),
+                    "extra_vars": json.dumps(group.extra_vars),
                 },
                 "storage_profile": {
                     "osDisk": {
@@ -133,14 +133,14 @@ def provision_vm(
                 },
                 "os_profile": {
                     "computer_name": instance_name,
-                    "admin_username": group["user"],
+                    "admin_username": group.user,
                     "linux_configuration": {
                         "ssh": {
                             "public_keys": [
                                 {
                                     "path": "/home/%s/.ssh/authorized_keys"
-                                    % group["user"],
-                                    "key_data": group["public_key_id"],
+                                    % group.user,
+                                    "key_data": group.public_key_id,
                                 }
                             ]
                         }
@@ -161,8 +161,8 @@ def provision_vm(
                                         % (
                                             azure_subscription_id,
                                             azure_resource_group,
-                                            group["vpc_id"],
-                                            group["subnet"],
+                                            group.vpc_id,
+                                            group.subnet,
                                         )
                                     },
                                     "public_ip_address_configuration": {
@@ -186,8 +186,8 @@ def provision_vm(
         update_errors(e)
 
 
-def terminate_vm(instance: dict, update_errors):
-    logger.debug(f"--azure {instance['id']}")
+def terminate_vm(instance: CloudInstance, update_errors):
+    logger.debug(f"--azure {instance.id}")
 
     azure_subscription_id = os.getenv("AZURE_SUBSCRIPTION_ID")
     azure_resource_group = os.getenv("AZURE_RESOURCE_GROUP")
@@ -198,7 +198,7 @@ def terminate_vm(instance: dict, update_errors):
         client = ComputeManagementClient(credential, azure_subscription_id)
 
         async_vm_delete = client.virtual_machines.begin_delete(
-            azure_resource_group, instance["id"]
+            azure_resource_group, instance.id
         )
         async_vm_delete.wait()
 
@@ -206,9 +206,9 @@ def terminate_vm(instance: dict, update_errors):
         update_errors(e)
 
 
-def modify_vm(instance: dict, new_cpus_count, get_instance_type, update_errors):
+def modify_vm(instance: CloudInstance, new_cpus_count, get_instance_type, update_errors):
     update_errors("Azure instance type modification is not implemented")
 
 
-def resize_vm(instance: dict, new_disk_size, update_errors):
+def resize_vm(instance: CloudInstance, new_disk_size, update_errors):
     update_errors("Azure disk resize is not implemented")

@@ -23,28 +23,28 @@ python3 tools/generate_codemap.py
 - Keep deployment schema changes in `cloud_instance/models.py`.
 - Keep reconciliation/provider-neutral planning in `cloud_instance/core/build.py`.
 - Keep provider-specific create/fetch/parse/delete behavior in `cloud_instance/providers/`.
-- Preserve the common instance dict shape returned by parsers unless every caller is updated together.
-- Deployment models may validate and normalize input, but provider code currently consumes plain dicts.
+- Provider parsers should return `CloudInstance`; collections should be plain `list[CloudInstance]`.
+- Deployment models validate and normalize input before command/core/provider code consumes it.
 
 ## Modules
 
 | File | Purpose / Public Surface |
 | --- | --- |
 | `cloud_instance/__init__.py` | no public classes/functions |
-| `cloud_instance/cli.py` | Typer CLI entrypoint. Parses JSON options and dispatches command handlers. functions: cli_create, cli_gather, cli_slated, cli_modify, cli_resize, cli_delete, version_option |
+| `cloud_instance/cli.py` | Typer CLI entrypoint. Parses JSON options and dispatches command handlers. functions: instances_to_json, cli_create, cli_gather, cli_slated, cli_modify, cli_resize, cli_delete, version_option |
 | `cloud_instance/commands/__init__.py` | no public classes/functions |
 | `cloud_instance/commands/create.py` | Create/converge command: fetch current state, build delta, provision new instances, terminate surplus. functions: create |
 | `cloud_instance/commands/delete.py` | Delete command: fetch and terminate all instances for a deployment. functions: delete |
 | `cloud_instance/commands/gather.py` | Gather command: return current instances for a deployment. functions: gather |
-| `cloud_instance/commands/modify.py` | Modify command: change instance type/CPU size for selected instances. functions: update_errors, get_instance_type, modify, modify_vm |
-| `cloud_instance/commands/resize.py` | Resize command: resize disks for selected instances. functions: update_errors, resize, resize_vm |
+| `cloud_instance/commands/modify.py` | Modify command: change instance type/CPU size for selected instances. functions: update_errors, get_instance_type, modify, modify_instance |
+| `cloud_instance/commands/resize.py` | Resize command: resize disks for selected instances. functions: update_errors, resize, resize_instance |
 | `cloud_instance/commands/slated.py` | Slated command: show instances that would be deleted by convergence. functions: slated |
 | `cloud_instance/core/__init__.py` | no public classes/functions |
-| `cloud_instance/core/build.py` | Reconciliation planner. Compares desired deployment groups with fetched instances and creates provider work items. functions: build, build_cluster, build_group, merge_dicts |
+| `cloud_instance/core/build.py` | Reconciliation planner. Compares desired deployment groups with fetched instances and creates provider work items. functions: build, build_cluster, build_group, matches_group, merge_cluster_group |
 | `cloud_instance/core/fetch.py` | Provider-neutral fetch coordinator. functions: fetch, update_instances_list, update_errors |
 | `cloud_instance/core/provision.py` | Provider-neutral provisioning coordinator. functions: update_new_deployment, update_errors, get_instance_type, provision, provision_aws_vm, provision_gcp_vm, provision_azure_vm |
 | `cloud_instance/core/terminate.py` | Provider-neutral termination coordinator. functions: terminate, update_errors |
-| `cloud_instance/models.py` | Typed deployment schema and shared enums. classes: IPAddressType, CloudInstance, InstanceSpec, Volume, Volumes, Group, Cluster, Deployment |
+| `cloud_instance/models.py` | Typed deployment schema and shared enums. classes: IPAddressType, CloudInstance, InstanceDefaults, GroupFilter, InstanceSpec, Volume, Volumes, Group, Cluster, Deployment, ProvisionTask, ProvisionTasks, BuildResult |
 | `cloud_instance/providers/__init__.py` | no public classes/functions |
 | `cloud_instance/providers/aws.py` | AWS lifecycle implementation: fetch, parse, provision, and terminate. functions: first_ipv6_address, parse_instances, fetch_instances, provision_vm, terminate_vm, modify_vm, resize_vm |
 | `cloud_instance/providers/azure.py` | Azure lifecycle implementation: parse, provision, and terminate. functions: parse_instance, provision_vm, terminate_vm, modify_vm, resize_vm |

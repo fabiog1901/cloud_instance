@@ -9,7 +9,6 @@ errors: list[str] = []
 
 
 def delete(deployment_id: str) -> None:
-
     try:
         current_instances = fetch(deployment_id)
     except:
@@ -23,5 +22,5 @@ def delete(deployment_id: str) -> None:
 
     try:
         terminate(current_instances)
-    except Exception as e:
-        raise ValueError(f"Failed at terminating instances.")
+    except Exception:
+        raise ValueError("Failed at terminating instances.")
