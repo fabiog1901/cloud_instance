@@ -14,7 +14,7 @@ from azure.mgmt.compute import ComputeManagementClient
 from google.cloud.compute_v1 import InstancesClient
 from google.cloud.compute_v1.services.addresses.client import AddressesClient
 
-from ..models.ip_address import IPAddressType
+from ..models import IPAddressType
 from .fetch import fetch
 
 logger = logging.getLogger("cloud_instance")

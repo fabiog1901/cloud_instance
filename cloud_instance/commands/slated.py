@@ -6,12 +6,14 @@ logger = logging.getLogger("cloud_instance")
 
 from ..util.build import build
 from ..util.fetch import fetch
+from ..models import Deployment
 
 
 def slated(
     deployment_id: str,
-    deployment: list,
+    deployment: list[dict],
 ) -> list[dict]:
+    deployment = Deployment.from_list(deployment).to_list()
 
     logger.info(f"Fetching all instances with {deployment_id=}")
 

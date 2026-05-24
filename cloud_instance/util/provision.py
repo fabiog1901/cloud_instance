@@ -28,7 +28,7 @@ from google.cloud.compute_v1.services.addresses.client import AddressesClient
 from google.cloud.compute_v1.services.global_addresses import GlobalAddressesClient
 from google.cloud.compute_v1.types import Address, Items, Metadata
 
-from ..models.ip_address import IPAddressType
+from ..models import IPAddressType
 from .common import wait_for_extended_operation
 from .parse import parse_aws_query, parse_azure_query, parse_gcp_query
 

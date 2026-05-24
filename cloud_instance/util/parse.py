@@ -2,7 +2,7 @@ import json
 
 from google.cloud.compute_v1.types import Instance
 
-from ..models.ip_address import IPAddressType
+from ..models import IPAddressType
 
 
 def first_aws_ipv6_address(instance: dict):

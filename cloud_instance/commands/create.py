@@ -8,14 +8,16 @@ from ..util.build import build
 from ..util.fetch import fetch
 from ..util.provision import provision
 from ..util.terminate import terminate
+from ..models import Deployment
 
 
 def create(
     deployment_id: str,
-    deployment: list,
+    deployment: list[dict],
     defaults: dict,
     preserve: bool,
 ) -> list[dict]:
+    deployment = Deployment.from_list(deployment).to_list()
 
     logger.info(f"Fetching all instances with {deployment_id=}")
 

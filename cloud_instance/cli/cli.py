@@ -9,12 +9,12 @@ import typer
 from ..cli.dep import EPILOG
 
 # import cloud_instance.cli.util
-from ..models.create import create
-from ..models.delete import delete
-from ..models.gather import gather
-from ..models.modify import modify
-from ..models.resize import resize
-from ..models.slated import slated
+from ..commands.create import create
+from ..commands.delete import delete
+from ..commands.gather import gather
+from ..commands.modify import modify
+from ..commands.resize import resize
+from ..commands.slated import slated
 
 from .. import __version__
 
