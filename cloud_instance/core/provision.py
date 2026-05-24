@@ -1,12 +1,9 @@
 import logging
-import os
 from threading import Lock, Thread
 
 from .errors import operation_error
-from ..models import CloudInstance, Group, InstanceDefaults, ProvisionTask, ProvisionTasks
-from ..providers.aws import provision_vm as provision_aws
-from ..providers.azure import provision_vm as provision_azure
-from ..providers.gcp import provision_vm as provision_gcp
+from ..models import CloudInstance, Group, InstanceDefaults, ProvisionTask
+from ..providers import aws, gcp
 
 logger = logging.getLogger("cloud_instance")
 
@@ -46,7 +43,7 @@ def get_instance_type(group: Group):
 
 
 def provision(
-    new_vms: ProvisionTasks, instance_defaults: InstanceDefaults
+    new_vms: list[ProvisionTask], instance_defaults: InstanceDefaults
 ) -> list[CloudInstance]:
     global defaults
     global instances
@@ -58,9 +55,8 @@ def provision(
     threads = []
     for task in new_vms:
         target = {
-            "aws": provision_aws_vm,
-            "gcp": provision_gcp_vm,
-            "azure": provision_azure_vm,
+            "aws": aws.provision_vm,
+            "gcp": gcp.provision_vm,
         }.get(task.group.cloud)
         if target is None:
             update_errors(f"Unsupported cloud provider: {task.group.cloud}")
@@ -68,7 +64,15 @@ def provision(
 
         thread = Thread(
             target=target,
-            args=(task,),
+            args=(
+                task.deployment_id,
+                task.cluster_name,
+                task.group,
+                task.index,
+                get_instance_type,
+                update_new_deployment,
+                update_errors,
+            ),
         )
         thread.start()
         threads.append(thread)
@@ -80,41 +84,3 @@ def provision(
         raise operation_error("Provision instances", errors)
 
     return instances
-
-
-def provision_aws_vm(task: ProvisionTask):
-    provision_aws(
-        task.deployment_id,
-        task.cluster_name,
-        task.group,
-        task.index,
-        get_instance_type,
-        update_new_deployment,
-        update_errors,
-    )
-
-
-def provision_gcp_vm(task: ProvisionTask):
-    provision_gcp(
-        task.deployment_id,
-        task.cluster_name,
-        task.group,
-        task.index,
-        get_instance_type,
-        update_new_deployment,
-        update_errors,
-    )
-
-
-def provision_azure_vm(task: ProvisionTask):
-    provision_azure(
-        task.deployment_id,
-        task.cluster_name,
-        task.group,
-        task.index,
-        get_instance_type,
-        update_new_deployment,
-        update_errors,
-        os.getenv("AZURE_SUBSCRIPTION_ID"),
-        os.getenv("AZURE_RESOURCE_GROUP"),
-    )

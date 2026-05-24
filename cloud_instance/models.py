@@ -387,27 +387,10 @@ class ProvisionTask:
 
 
 @dataclass(slots=True)
-class ProvisionTasks:
-    items: list[ProvisionTask] = field(default_factory=list)
-
-    def append(self, task: ProvisionTask) -> None:
-        self.items.append(task)
-
-    def extend(self, tasks: "ProvisionTasks") -> None:
-        self.items.extend(tasks.items)
-
-    def __iter__(self):
-        return iter(self.items)
-
-    def __len__(self) -> int:
-        return len(self.items)
-
-
-@dataclass(slots=True)
 class BuildResult:
     current_vms: list[CloudInstance] = field(default_factory=list)
     surplus_vms: list[CloudInstance] = field(default_factory=list)
-    new_vms: ProvisionTasks = field(default_factory=ProvisionTasks)
+    new_vms: list[ProvisionTask] = field(default_factory=list)
 
 
 def _require_mapping(value: Any, name: str) -> dict[str, Any]:

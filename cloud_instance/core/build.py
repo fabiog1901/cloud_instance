@@ -7,7 +7,6 @@ from ..models import (
     Deployment,
     Group,
     ProvisionTask,
-    ProvisionTasks,
 )
 
 logger = logging.getLogger("cloud_instance")

@@ -43,9 +43,9 @@ python3 tools/generate_codemap.py
 | `cloud_instance/core/build.py` | Reconciliation planner. Compares desired deployment groups with fetched instances and creates provider work items. functions: build, build_cluster, build_group, matches_group, merge_cluster_group |
 | `cloud_instance/core/errors.py` | functions: error_message, format_errors, operation_error |
 | `cloud_instance/core/fetch.py` | Provider-neutral fetch coordinator. functions: fetch, update_instances_list, update_errors |
-| `cloud_instance/core/provision.py` | Provider-neutral provisioning coordinator. functions: update_new_deployment, update_errors, get_instance_type, provision, provision_aws_vm, provision_gcp_vm, provision_azure_vm |
+| `cloud_instance/core/provision.py` | Provider-neutral provisioning coordinator. functions: update_new_deployment, update_errors, get_instance_type, provision |
 | `cloud_instance/core/terminate.py` | Provider-neutral termination coordinator. functions: terminate, update_errors |
-| `cloud_instance/models.py` | Typed deployment schema and shared enums. classes: IPAddressType, CloudInstance, InstanceDefaults, GroupFilter, InstanceSpec, Volume, Volumes, Group, Cluster, Deployment, ProvisionTask, ProvisionTasks, BuildResult |
+| `cloud_instance/models.py` | Typed deployment schema and shared enums. classes: IPAddressType, CloudInstance, InstanceDefaults, GroupFilter, InstanceSpec, Volume, Volumes, Group, Cluster, Deployment, ProvisionTask, BuildResult |
 | `cloud_instance/providers/__init__.py` | no public classes/functions |
 | `cloud_instance/providers/aws.py` | AWS lifecycle implementation: fetch, parse, provision, and terminate. functions: first_ipv6_address, parse_instances, fetch_instances, provision_vm, terminate_vm, modify_vm, resize_vm |
 | `cloud_instance/providers/azure.py` | Azure lifecycle implementation: parse, provision, and terminate. functions: parse_instance, provision_vm, terminate_vm, modify_vm, resize_vm |
