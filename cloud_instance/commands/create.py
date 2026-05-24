@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger("cloud_instance")
 
 
-from ..util.build import build
+from ..core.build import build
 from ..util.fetch import fetch
 from ..util.provision import provision
 from ..util.terminate import terminate

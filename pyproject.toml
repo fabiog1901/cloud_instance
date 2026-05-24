@@ -14,7 +14,7 @@ classifiers = [
 ]
 
 [tool.poetry.scripts]
-cloud_instance = 'cloud_instance.cli.cli:app'
+cloud_instance = 'cloud_instance.cli:app'
 
 [tool.poetry.dependencies]
 python = "^3.11"

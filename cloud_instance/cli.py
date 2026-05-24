@@ -5,18 +5,16 @@ import sys
 
 import typer
 
-# import cloud_instance.utils.common
-from ..cli.dep import EPILOG
+from .commands.create import create
+from .commands.delete import delete
+from .commands.gather import gather
+from .commands.modify import modify
+from .commands.resize import resize
+from .commands.slated import slated
 
-# import cloud_instance.cli.util
-from ..commands.create import create
-from ..commands.delete import delete
-from ..commands.gather import gather
-from ..commands.modify import modify
-from ..commands.resize import resize
-from ..commands.slated import slated
+from . import __version__
 
-from .. import __version__
+EPILOG = "Docs: <https://github.com/fabiog1901/cloud_instance>"
 
 # setup global logger
 logger = logging.getLogger("cloud_instance")
