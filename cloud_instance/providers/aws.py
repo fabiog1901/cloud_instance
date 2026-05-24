@@ -8,7 +8,7 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ConnectTimeoutError, ReadTimeoutError, SSLError
 
-from ..models import IPAddressType
+from ..models import CloudInstance, IPAddressType
 
 logger = logging.getLogger("cloud_instance")
 
@@ -22,7 +22,7 @@ def first_ipv6_address(instance: dict):
 
 
 def parse_instances(ec2_response: dict):
-    instances: list[dict] = []
+    instances: list[CloudInstance] = []
 
     for x in ec2_response["Reservations"]:
         for i in x["Instances"]:
@@ -34,26 +34,26 @@ def parse_instances(ec2_response: dict):
             public_ipv6 = first_ipv6_address(i)
 
             instances.append(
-                {
-                    "id": i["InstanceId"],
-                    "cloud": "aws",
-                    "region": i["Placement"]["AvailabilityZone"][:-1],
-                    "zone": i["Placement"]["AvailabilityZone"][-1],
-                    "public_ip": public_ipv4 or public_ipv6,
-                    "public_ipv4": public_ipv4,
-                    "public_ipv6": public_ipv6,
-                    "public_hostname": i.get("PublicDnsName", ""),
-                    "private_ip": i["PrivateIpAddress"],
-                    "private_hostname": i["PrivateDnsName"],
-                    "ansible_user": tags["ansible_user"],
-                    "inventory_groups": json.loads(tags["inventory_groups"]),
-                    "cluster_name": tags["cluster_name"],
-                    "group_name": tags["group_name"],
-                    "extra_vars": tags["extra_vars"],
-                    "ip_address_type": tags.get(
-                        "ip_address_type", IPAddressType.IPv4_EPHEMERAL.value
+                CloudInstance(
+                    id=i["InstanceId"],
+                    cloud="aws",
+                    region=i["Placement"]["AvailabilityZone"][:-1],
+                    zone=i["Placement"]["AvailabilityZone"][-1],
+                    public_ip=public_ipv4 or public_ipv6,
+                    public_ipv4=public_ipv4,
+                    public_ipv6=public_ipv6,
+                    public_hostname=i.get("PublicDnsName", ""),
+                    private_ip=i["PrivateIpAddress"],
+                    private_hostname=i["PrivateDnsName"],
+                    ansible_user=tags["ansible_user"],
+                    inventory_groups=json.loads(tags["inventory_groups"]),
+                    cluster_name=tags["cluster_name"],
+                    group_name=tags["group_name"],
+                    extra_vars=tags["extra_vars"],
+                    ip_address_type=IPAddressType(
+                        tags.get("ip_address_type", IPAddressType.IPv4_EPHEMERAL.value)
                     ),
-                }
+                )
             )
     return instances
 
@@ -86,7 +86,7 @@ def fetch_instances(deployment_id: str, update_instances_list, update_errors):
                 ]
             )
 
-            aws_instances: list = parse_instances(response)
+            aws_instances = [x.to_dict() for x in parse_instances(response)]
 
             if aws_instances:
                 update_instances_list(aws_instances)
@@ -272,7 +272,7 @@ def provision_vm(
             InstanceIds=[response["Instances"][0]["InstanceId"]]
         )
 
-        update_new_deployment(parse_instances(response))
+        update_new_deployment([x.to_dict() for x in parse_instances(response)])
     except Exception as e:
         if ec2 and allocation_id and not eip_associated:
             try:

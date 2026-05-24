@@ -12,6 +12,77 @@ class IPAddressType(StrEnum):
 
 
 @dataclass(slots=True)
+class CloudInstance:
+    id: str
+    cloud: str
+    region: str
+    zone: str
+    public_ip: str | None = None
+    public_hostname: str = ""
+    private_ip: str | None = None
+    private_hostname: str = ""
+    ansible_user: str = ""
+    inventory_groups: list[str] = field(default_factory=list)
+    cluster_name: str = ""
+    group_name: str = ""
+    extra_vars: str | dict[str, Any] = field(default_factory=dict)
+    public_ipv4: str | None = None
+    public_ipv6: str | None = None
+    ip_address_type: IPAddressType | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> "CloudInstance":
+        data = _require_mapping(value, "instance")
+        return cls(
+            id=data.pop("id"),
+            cloud=data.pop("cloud"),
+            region=data.pop("region"),
+            zone=data.pop("zone"),
+            public_ip=data.pop("public_ip", None),
+            public_hostname=data.pop("public_hostname", ""),
+            private_ip=data.pop("private_ip", None),
+            private_hostname=data.pop("private_hostname", ""),
+            ansible_user=data.pop("ansible_user", ""),
+            inventory_groups=_as_str_list(
+                data.pop("inventory_groups", []), "inventory_groups"
+            ),
+            cluster_name=data.pop("cluster_name", ""),
+            group_name=data.pop("group_name", ""),
+            extra_vars=data.pop("extra_vars", {}),
+            public_ipv4=data.pop("public_ipv4", None),
+            public_ipv6=data.pop("public_ipv6", None),
+            ip_address_type=_ip_address_type(data.pop("ip_address_type", None)),
+            extra=data,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        data = _without_empty(
+            {
+                "id": self.id,
+                "cloud": self.cloud,
+                "region": self.region,
+                "zone": self.zone,
+                "public_ip": self.public_ip,
+                "public_hostname": self.public_hostname,
+                "private_ip": self.private_ip,
+                "private_hostname": self.private_hostname,
+                "ansible_user": self.ansible_user,
+                "inventory_groups": self.inventory_groups,
+                "cluster_name": self.cluster_name,
+                "group_name": self.group_name,
+                "extra_vars": self.extra_vars,
+                "public_ipv4": self.public_ipv4,
+                "public_ipv6": self.public_ipv6,
+                "ip_address_type": (
+                    self.ip_address_type.value if self.ip_address_type else None
+                ),
+            }
+        )
+        return {**self.extra, **data}
+
+
+@dataclass(slots=True)
 class InstanceSpec:
     cpu: int | str | None = None
     mem: int | str | None = None

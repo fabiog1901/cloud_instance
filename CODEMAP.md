@@ -41,13 +41,12 @@ python3 tools/generate_codemap.py
 | `cloud_instance/commands/slated.py` | Slated command: show instances that would be deleted by convergence. functions: slated |
 | `cloud_instance/core/__init__.py` | no public classes/functions |
 | `cloud_instance/core/build.py` | Reconciliation planner. Compares desired deployment groups with fetched instances and creates provider work items. functions: build, build_cluster, build_group, merge_dicts |
-| `cloud_instance/models.py` | Typed deployment schema and shared enums. classes: IPAddressType, InstanceSpec, Volume, Volumes, Group, Cluster, Deployment |
+| `cloud_instance/models.py` | Typed deployment schema and shared enums. classes: IPAddressType, CloudInstance, InstanceSpec, Volume, Volumes, Group, Cluster, Deployment |
 | `cloud_instance/providers/__init__.py` | no public classes/functions |
 | `cloud_instance/providers/aws.py` | AWS lifecycle implementation: fetch, parse, provision, and terminate. functions: first_ipv6_address, parse_instances, fetch_instances, provision_vm, terminate_vm, modify_vm, resize_vm |
 | `cloud_instance/providers/azure.py` | Azure lifecycle implementation: parse, provision, and terminate. functions: parse_instance, provision_vm, terminate_vm, modify_vm, resize_vm |
 | `cloud_instance/providers/gcp.py` | GCP lifecycle implementation: fetch, parse, provision, and terminate. functions: parse_instance, fetch_instances, provision_vm, terminate_vm, modify_vm, resize_vm |
 | `cloud_instance/util/common.py` | Shared utility helpers. functions: wait_for_extended_operation |
 | `cloud_instance/util/fetch.py` | Provider-neutral fetch coordinator. functions: fetch, update_instances_list, update_errors |
-| `cloud_instance/util/parse.py` | Compatibility exports for provider parsers. no public classes/functions |
 | `cloud_instance/util/provision.py` | Provider-neutral provisioning coordinator. functions: update_new_deployment, update_errors, get_instance_type, provision, provision_aws_vm, provision_gcp_vm, provision_azure_vm |
 | `cloud_instance/util/terminate.py` | Provider-neutral termination coordinator. functions: terminate, update_errors |

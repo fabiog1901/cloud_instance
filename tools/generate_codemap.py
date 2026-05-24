@@ -25,7 +25,6 @@ LAYER_NOTES = {
     "cloud_instance/providers/gcp.py": "GCP lifecycle implementation: fetch, parse, provision, and terminate.",
     "cloud_instance/util/common.py": "Shared utility helpers.",
     "cloud_instance/util/fetch.py": "Provider-neutral fetch coordinator.",
-    "cloud_instance/util/parse.py": "Compatibility exports for provider parsers.",
     "cloud_instance/util/provision.py": "Provider-neutral provisioning coordinator.",
     "cloud_instance/util/terminate.py": "Provider-neutral termination coordinator.",
 }

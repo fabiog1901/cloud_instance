@@ -6,26 +6,28 @@ import random
 from azure.identity import EnvironmentCredential
 from azure.mgmt.compute import ComputeManagementClient
 
+from ..models import CloudInstance
+
 logger = logging.getLogger("cloud_instance")
 
 
 def parse_instance(vm, private_ip, public_ip, public_hostname):
     return [
-        {
-            "id": vm.name,
-            "cloud": "azure",
-            "region": vm.location,
-            "zone": "default",
-            "public_ip": public_ip,
-            "public_hostname": public_hostname,
-            "private_ip": private_ip,
-            "private_hostname": vm.name + ".internal.cloudapp.net",
-            "ansible_user": vm.tags["ansible_user"],
-            "inventory_groups": json.loads(vm.tags["inventory_groups"]),
-            "cluster_name": vm.tags["cluster_name"],
-            "group_name": vm.tags["group_name"],
-            "extra_vars": vm.tags["extra_vars"],
-        }
+        CloudInstance(
+            id=vm.name,
+            cloud="azure",
+            region=vm.location,
+            zone="default",
+            public_ip=public_ip,
+            public_hostname=public_hostname,
+            private_ip=private_ip,
+            private_hostname=vm.name + ".internal.cloudapp.net",
+            ansible_user=vm.tags["ansible_user"],
+            inventory_groups=json.loads(vm.tags["inventory_groups"]),
+            cluster_name=vm.tags["cluster_name"],
+            group_name=vm.tags["group_name"],
+            extra_vars=vm.tags["extra_vars"],
+        ).to_dict()
     ]
 
 

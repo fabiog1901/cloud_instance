@@ -20,7 +20,7 @@ from google.cloud.compute_v1 import (
 from google.cloud.compute_v1.services.addresses.client import AddressesClient
 from google.cloud.compute_v1.types import Address, Items, Metadata
 
-from ..models import IPAddressType
+from ..models import CloudInstance, IPAddressType
 from ..util.common import wait_for_extended_operation
 
 logger = logging.getLogger("cloud_instance")
@@ -34,21 +34,21 @@ def parse_instance(instance: Instance, region, zone):
     ip = instance.network_interfaces[0].access_configs[0].nat_i_p.split(".")
     public_dns = ".".join([ip[3], ip[2], ip[1], ip[0], "bc.googleusercontent.com"])
 
-    return {
-        "id": instance.name,
-        "cloud": "gcp",
-        "region": region,
-        "zone": zone,
-        "public_ip": instance.network_interfaces[0].access_configs[0].nat_i_p,
-        "public_hostname": public_dns,
-        "private_ip": instance.network_interfaces[0].network_i_p,
-        "private_hostname": f"{instance.name}.c.cea-team.internal",
-        "ansible_user": tags["ansible_user"],
-        "inventory_groups": json.loads(tags["inventory_groups"]),
-        "cluster_name": tags["cluster_name"],
-        "group_name": tags["group_name"],
-        "extra_vars": tags["extra_vars"],
-    }
+    return CloudInstance(
+        id=instance.name,
+        cloud="gcp",
+        region=region,
+        zone=zone,
+        public_ip=instance.network_interfaces[0].access_configs[0].nat_i_p,
+        public_hostname=public_dns,
+        private_ip=instance.network_interfaces[0].network_i_p,
+        private_hostname=f"{instance.name}.c.cea-team.internal",
+        ansible_user=tags["ansible_user"],
+        inventory_groups=json.loads(tags["inventory_groups"]),
+        cluster_name=tags["cluster_name"],
+        group_name=tags["group_name"],
+        extra_vars=tags["extra_vars"],
+    )
 
 
 def fetch_instances(deployment_id: str, update_instances_list, update_errors):
@@ -74,7 +74,9 @@ def fetch_instances(deployment_id: str, update_instances_list, update_errors):
             if response.instances:
                 for x in response.instances:
                     if x.status in ("PROVISIONING", "STAGING", "RUNNING"):
-                        instances.append(parse_instance(x, zone[6:-2], zone[-1]))
+                        instances.append(
+                            parse_instance(x, zone[6:-2], zone[-1]).to_dict()
+                        )
 
         if instances:
             update_instances_list(instances)
@@ -254,7 +256,9 @@ def provision_vm(
             project=gcp_project, zone=gcpzone, instance=instance_name
         )
 
-        update_new_deployment([parse_instance(instance, group["region"], group["zone"])])
+        update_new_deployment(
+            [parse_instance(instance, group["region"], group["zone"]).to_dict()]
+        )
 
     except Exception as e:
         update_errors(e)
