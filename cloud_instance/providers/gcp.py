@@ -21,9 +21,18 @@ from google.cloud.compute_v1.services.addresses.client import AddressesClient
 from google.cloud.compute_v1.types import Address, Items, Metadata
 
 from ..models import CloudInstance, IPAddressType
-from ..util.common import wait_for_extended_operation
 
 logger = logging.getLogger("cloud_instance")
+
+
+def wait_for_extended_operation(op):
+    result = op.result(timeout=300)
+
+    if op.error_code:
+        logger.error(f"GCP Error: {op.error_code}: {op.error_message}")
+        raise ValueError(f"GCP Error: {op.error_code}: {op.error_message}")
+
+    return result
 
 
 def parse_instance(instance: Instance, region, zone):

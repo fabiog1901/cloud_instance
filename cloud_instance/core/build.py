@@ -1,7 +1,7 @@
 import logging
 from threading import Lock, Thread
 
-from ..util.provision import provision_aws_vm, provision_azure_vm, provision_gcp_vm
+from .provision import provision_aws_vm, provision_azure_vm, provision_gcp_vm
 
 logger = logging.getLogger("cloud_instance")
 

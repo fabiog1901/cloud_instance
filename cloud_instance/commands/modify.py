@@ -5,7 +5,7 @@ from threading import Lock, Thread
 from ..providers.aws import modify_vm as modify_aws_vm
 from ..providers.azure import modify_vm as modify_azure_vm
 from ..providers.gcp import modify_vm as modify_gcp_vm
-from ..util.fetch import fetch
+from ..core.fetch import fetch
 
 logger = logging.getLogger("cloud_instance")
 

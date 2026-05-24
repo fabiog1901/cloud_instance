@@ -5,7 +5,7 @@ logger = logging.getLogger("cloud_instance")
 
 
 from ..core.build import build
-from ..util.fetch import fetch
+from ..core.fetch import fetch
 from ..models import Deployment
 
 

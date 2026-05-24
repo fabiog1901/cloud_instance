@@ -5,7 +5,7 @@ from threading import Lock, Thread
 from ..providers.aws import resize_vm as resize_aws_vm
 from ..providers.azure import resize_vm as resize_azure_vm
 from ..providers.gcp import resize_vm as resize_gcp_vm
-from ..util.fetch import fetch
+from ..core.fetch import fetch
 
 logger = logging.getLogger("cloud_instance")
 

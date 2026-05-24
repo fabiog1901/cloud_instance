@@ -1,7 +1,7 @@
 import logging
 
-from ..util.fetch import fetch
-from ..util.terminate import terminate
+from ..core.fetch import fetch
+from ..core.terminate import terminate
 
 logger = logging.getLogger("cloud_instance")
 

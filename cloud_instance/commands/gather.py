@@ -3,7 +3,7 @@ import logging
 # setup global logger
 logger = logging.getLogger("cloud_instance")
 
-from ..util.fetch import fetch
+from ..core.fetch import fetch
 
 
 def gather(
