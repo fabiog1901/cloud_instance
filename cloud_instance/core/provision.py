@@ -1,9 +1,9 @@
 import logging
 from threading import Lock, Thread
 
-from .errors import operation_error
 from ..models import CloudInstance, Group, InstanceDefaults, ProvisionTask
 from ..providers import aws, gcp
+from .errors import operation_error
 
 logger = logging.getLogger("cloud_instance")
 

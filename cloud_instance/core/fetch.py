@@ -1,10 +1,10 @@
 import logging
 from threading import Lock, Thread
 
-from .errors import operation_error
 from ..models import CloudInstance
 from ..providers.aws import fetch_instances as fetch_aws_instances
 from ..providers.gcp import fetch_instances as fetch_gcp_instances
+from .errors import operation_error
 
 logger = logging.getLogger("cloud_instance")
 

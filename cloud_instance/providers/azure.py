@@ -80,7 +80,13 @@ def provision_vm(
                 "name": instance_name + "-disk-" + str(i),
                 "create_option": "Attach",
                 "delete_option": (
-                    "Delete" if (x.delete_on_termination if x.delete_on_termination is not None else True) else "Detach"
+                    "Delete"
+                    if (
+                        x.delete_on_termination
+                        if x.delete_on_termination is not None
+                        else True
+                    )
+                    else "Detach"
                 ),
                 "managed_disk": {"id": data_disk.id},
             }
@@ -206,7 +212,9 @@ def terminate_vm(instance: CloudInstance, update_errors):
         update_errors(e)
 
 
-def modify_vm(instance: CloudInstance, new_cpus_count, get_instance_type, update_errors):
+def modify_vm(
+    instance: CloudInstance, new_cpus_count, get_instance_type, update_errors
+):
     update_errors("Azure instance type modification is not implemented")
 
 

@@ -6,14 +6,13 @@ import time
 
 import typer
 
+from . import __version__
 from .commands.create import create
 from .commands.delete import delete
 from .commands.gather import gather
 from .commands.modify import modify
 from .commands.resize import resize
 from .commands.slated import slated
-
-from . import __version__
 from .models import CloudInstance, Deployment, GroupFilter, InstanceDefaults
 
 EPILOG = "Docs: <https://github.com/fabiog1901/cloud_instance>"
@@ -21,6 +20,7 @@ EPILOG = "Docs: <https://github.com/fabiog1901/cloud_instance>"
 # setup global logger
 logger = logging.getLogger("cloud_instance")
 logger.setLevel(logging.INFO)
+
 
 class ShorthandFormatter(logging.Formatter):
     LEVEL_MAP = {
@@ -37,7 +37,8 @@ class ShorthandFormatter(logging.Formatter):
         result = super().format(record)
         record.levelname = original_levelname
         return result
-    
+
+
 # create console handler and set level to debug
 ch = logging.FileHandler(filename="/tmp/cloud_instance.log")
 ch.setLevel(logging.INFO)

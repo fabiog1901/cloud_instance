@@ -9,7 +9,7 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ConnectTimeoutError, ReadTimeoutError, SSLError
 
-from ..models import CloudInstance, Group, IPAddressType, InstanceSpec
+from ..models import CloudInstance, Group, InstanceSpec, IPAddressType
 
 logger = logging.getLogger("cloud_instance")
 
@@ -97,10 +97,9 @@ def fetch_instances(deployment_id: str, update_instances_list, update_errors):
         except ReadTimeoutError:
             logger.warning("EC2 response timed out")
         except SSLError as e:
-            if (
-                "SSL validation failed" in str(e)
-                and "UNEXPECTED_EOF_WHILE_READING" in str(e)
-            ):
+            if "SSL validation failed" in str(
+                e
+            ) and "UNEXPECTED_EOF_WHILE_READING" in str(e):
                 logger.warning("EC2 SSL validation failed due to unexpected EOF")
             else:
                 update_errors(e)
@@ -143,9 +142,7 @@ def provision_vm(
 
     def get_ip_address_type(x):
         try:
-            return IPAddressType(
-                x.ip_address_type or IPAddressType.IPv4_EPHEMERAL
-            )
+            return IPAddressType(x.ip_address_type or IPAddressType.IPv4_EPHEMERAL)
         except ValueError:
             raise ValueError(f"Invalid ip_address_type: {x.ip_address_type}") from None
 
@@ -181,10 +178,7 @@ def provision_vm(
             if (x.type or "standard_ssd") in ["premium_ssd", "standard_ssd"]:
                 dev["Ebs"]["Iops"] = int(x.iops or 3000)
 
-            if (
-                x.throughput
-                and (x.type or "standard_ssd") == "standard_ssd"
-            ):
+            if x.throughput and (x.type or "standard_ssd") == "standard_ssd":
                 dev["Ebs"]["Throughput"] = x.throughput or 125
 
             bdm.append(dev)
@@ -202,9 +196,7 @@ def provision_vm(
                 "Value": json.dumps(group.inventory_groups + [cluster_name]),
             }
         )
-        tags.append(
-            {"Key": "extra_vars", "Value": json.dumps(group.extra_vars)}
-        )
+        tags.append({"Key": "extra_vars", "Value": json.dumps(group.extra_vars)})
         tags.append({"Key": "ip_address_type", "Value": ip_address_type.value})
 
         if group.role:
@@ -212,7 +204,9 @@ def provision_vm(
         else:
             role = {}
 
-        arch = group.instance.arch if group.instance and group.instance.arch else "amd64"
+        arch = (
+            group.instance.arch if group.instance and group.instance.arch else "amd64"
+        )
 
         image_id = boto3.client("ssm", region_name=group.region).get_parameter(
             Name=f"/aws/service{group.image}/stable/current/{arch}/hvm/ebs-gp3/ami-id"
@@ -357,7 +351,9 @@ def terminate_vm(instance: CloudInstance, update_errors):
         update_errors(str(e))
 
 
-def modify_vm(instance: CloudInstance, new_cpus_count, get_instance_type, update_errors):
+def modify_vm(
+    instance: CloudInstance, new_cpus_count, get_instance_type, update_errors
+):
     instance_id = instance.id
 
     try:

@@ -5,8 +5,8 @@ import random
 
 from google.cloud.compute_v1 import (
     AccessConfig,
-    AggregatedListInstancesRequest,
     AddressesClient,
+    AggregatedListInstancesRequest,
     AttachedDisk,
     AttachedDiskInitializeParams,
     DisksClient,
@@ -20,7 +20,7 @@ from google.cloud.compute_v1 import (
 from google.cloud.compute_v1.services.addresses.client import AddressesClient
 from google.cloud.compute_v1.types import Address, Items, Metadata
 
-from ..models import CloudInstance, Group, IPAddressType, InstanceSpec
+from ..models import CloudInstance, Group, InstanceSpec, IPAddressType
 
 logger = logging.getLogger("cloud_instance")
 
@@ -159,7 +159,11 @@ def provision_vm(
             get_type((group.volumes.os.type or "standard_ssd")),
         )
         boot_disk.initialize_params = initialize_params
-        boot_disk.auto_delete = (group.volumes.os.delete_on_termination if group.volumes.os.delete_on_termination is not None else True)
+        boot_disk.auto_delete = (
+            group.volumes.os.delete_on_termination
+            if group.volumes.os.delete_on_termination is not None
+            else True
+        )
         vols.append(boot_disk)
 
         for i, x in enumerate(group.volumes.data):
@@ -180,7 +184,9 @@ def provision_vm(
             )
 
             disk.initialize_params = init_params
-            disk.auto_delete = (x.delete_on_termination if x.delete_on_termination is not None else True)
+            disk.auto_delete = (
+                x.delete_on_termination if x.delete_on_termination is not None else True
+            )
 
             vols.append(disk)
 
@@ -297,7 +303,9 @@ def terminate_vm(instance: CloudInstance, update_errors):
         update_errors(e)
 
 
-def modify_vm(instance: CloudInstance, new_cpus_count: int, get_instance_type, update_errors):
+def modify_vm(
+    instance: CloudInstance, new_cpus_count: int, get_instance_type, update_errors
+):
     instance_id = instance.id
 
     gcp_project = os.getenv("GCP_PROJECT")

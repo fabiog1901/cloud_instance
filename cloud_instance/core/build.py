@@ -126,7 +126,9 @@ def merge_cluster_group(parent: Cluster, child: Group) -> Group:
     merged["tags"] = tags
 
     merged["inventory_groups"] = list(
-        set(parent_data.get("inventory_groups", []) + merged.get("inventory_groups", []))
+        set(
+            parent_data.get("inventory_groups", []) + merged.get("inventory_groups", [])
+        )
     )
 
     merged["security_groups"] = list(

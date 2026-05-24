@@ -57,9 +57,7 @@ def modify(
     for idx, x in enumerate(current_instances, start=1):
         logger.info(f"{idx}:\t{x}")
 
-    filtered_instances = [
-        x for x in current_instances if filter_by_groups.matches(x)
-    ]
+    filtered_instances = [x for x in current_instances if filter_by_groups.matches(x)]
 
     global defaults
     global errors

@@ -90,7 +90,9 @@ class InstanceDefaults:
     def from_dict(cls, value: Any) -> "InstanceDefaults":
         return cls(_require_mapping(value, "defaults"))
 
-    def instance_type(self, cloud: str, cpu: int | str | None, mem: int | str | None = None):
+    def instance_type(
+        self, cloud: str, cpu: int | str | None, mem: int | str | None = None
+    ):
         cpu_key = str(cpu)
         mem_key = str(mem or "default")
         return self.values[cloud][cpu_key][mem_key]
@@ -368,10 +370,7 @@ class Deployment:
     @classmethod
     def from_list(cls, value: Any) -> "Deployment":
         return cls(
-            clusters=[
-                Cluster.from_dict(x)
-                for x in _require_list(value, "deployment")
-            ]
+            clusters=[Cluster.from_dict(x) for x in _require_list(value, "deployment")]
         )
 
     def to_list(self) -> list[dict[str, Any]]:
@@ -423,8 +422,4 @@ def _ip_address_type(value: Any) -> IPAddressType | None:
 
 
 def _without_empty(data: dict[str, Any]) -> dict[str, Any]:
-    return {
-        k: v
-        for k, v in data.items()
-        if v is not None and v != {} and v != []
-    }
+    return {k: v for k, v in data.items() if v is not None and v != {} and v != []}

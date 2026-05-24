@@ -1,11 +1,11 @@
 import logging
 from threading import Lock, Thread
 
-from .errors import operation_error
 from ..models import CloudInstance
 from ..providers.aws import terminate_vm as terminate_aws_vm
 from ..providers.azure import terminate_vm as terminate_azure_vm
 from ..providers.gcp import terminate_vm as terminate_gcp_vm
+from .errors import operation_error
 
 logger = logging.getLogger("cloud_instance")
 

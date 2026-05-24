@@ -5,7 +5,6 @@ import ast
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "cloud_instance"
 OUTPUT = ROOT / "CODEMAP.md"
@@ -50,7 +49,9 @@ def public_defs(path: Path) -> tuple[list[str], list[str]]:
     for node in tree.body:
         if isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
             classes.append(node.name)
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith("_"):
+        elif isinstance(
+            node, (ast.FunctionDef, ast.AsyncFunctionDef)
+        ) and not node.name.startswith("_"):
             functions.append(node.name)
 
     return classes, functions
