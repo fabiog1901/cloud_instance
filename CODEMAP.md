@@ -11,9 +11,9 @@ python3 tools/generate_codemap.py
 
 ## Golden Flows
 
-- Create/converge: `cli.py` -> `commands/create.py` -> `util/fetch.py` -> `core/build.py` -> `util/provision.py` -> optional `util/terminate.py`
-- Delete: `cli.py` -> `commands/delete.py` -> `util/fetch.py` -> `util/terminate.py`
-- Query: `cli.py` -> `commands/gather.py` -> `util/fetch.py` -> `util/parse.py`
+- Create/converge: `cli.py` -> `commands/create.py` -> `util/fetch.py` -> `providers/*` -> `core/build.py` -> `util/provision.py` -> `providers/*` -> optional `util/terminate.py`
+- Delete: `cli.py` -> `commands/delete.py` -> `util/fetch.py` -> `providers/*` -> `util/terminate.py` -> `providers/*`
+- Query: `cli.py` -> `commands/gather.py` -> `util/fetch.py` -> `providers/*`
 - Slated-for-delete preview: `cli.py` -> `commands/slated.py` -> `util/fetch.py` -> `core/build.py`
 - Modify/resize: `cli.py` -> `commands/modify.py` or `commands/resize.py` -> provider APIs
 
@@ -22,7 +22,7 @@ python3 tools/generate_codemap.py
 - Keep CLI argument parsing in `cloud_instance/cli.py`; put command behavior in `cloud_instance/commands/`.
 - Keep deployment schema changes in `cloud_instance/models.py`.
 - Keep reconciliation/provider-neutral planning in `cloud_instance/core/build.py`.
-- Keep provider-specific create/fetch/parse/delete behavior in `provision.py`, `fetch.py`, `parse.py`, and `terminate.py`.
+- Keep provider-specific create/fetch/parse/delete behavior in `cloud_instance/providers/`.
 - Preserve the common instance dict shape returned by parsers unless every caller is updated together.
 - Deployment models may validate and normalize input, but provider code currently consumes plain dicts.
 
@@ -36,14 +36,18 @@ python3 tools/generate_codemap.py
 | `cloud_instance/commands/create.py` | Create/converge command: fetch current state, build delta, provision new instances, terminate surplus. functions: create |
 | `cloud_instance/commands/delete.py` | Delete command: fetch and terminate all instances for a deployment. functions: delete |
 | `cloud_instance/commands/gather.py` | Gather command: return current instances for a deployment. functions: gather |
-| `cloud_instance/commands/modify.py` | Modify command: change instance type/CPU size for selected instances. functions: update_errors, get_instance_type, modify, modify_aws_vm, modify_gcp_vm, modify_azure_vm |
-| `cloud_instance/commands/resize.py` | Resize command: resize disks for selected instances. functions: update_errors, resize, resize_aws_vm, resize_gcp_vm, resize_azure_vm |
+| `cloud_instance/commands/modify.py` | Modify command: change instance type/CPU size for selected instances. functions: update_errors, get_instance_type, modify, modify_vm |
+| `cloud_instance/commands/resize.py` | Resize command: resize disks for selected instances. functions: update_errors, resize, resize_vm |
 | `cloud_instance/commands/slated.py` | Slated command: show instances that would be deleted by convergence. functions: slated |
 | `cloud_instance/core/__init__.py` | no public classes/functions |
 | `cloud_instance/core/build.py` | Reconciliation planner. Compares desired deployment groups with fetched instances and creates provider work items. functions: build, build_cluster, build_group, merge_dicts |
 | `cloud_instance/models.py` | Typed deployment schema and shared enums. classes: IPAddressType, InstanceSpec, Volume, Volumes, Group, Cluster, Deployment |
+| `cloud_instance/providers/__init__.py` | no public classes/functions |
+| `cloud_instance/providers/aws.py` | AWS lifecycle implementation: fetch, parse, provision, and terminate. functions: first_ipv6_address, parse_instances, fetch_instances, provision_vm, terminate_vm, modify_vm, resize_vm |
+| `cloud_instance/providers/azure.py` | Azure lifecycle implementation: parse, provision, and terminate. functions: parse_instance, provision_vm, terminate_vm, modify_vm, resize_vm |
+| `cloud_instance/providers/gcp.py` | GCP lifecycle implementation: fetch, parse, provision, and terminate. functions: parse_instance, fetch_instances, provision_vm, terminate_vm, modify_vm, resize_vm |
 | `cloud_instance/util/common.py` | Shared utility helpers. functions: wait_for_extended_operation |
-| `cloud_instance/util/fetch.py` | Provider fetch logic. Queries cloud APIs for existing instances. functions: fetch, update_instances_list, update_errors, fetch_aws_instances, fetch_gcp_instances |
-| `cloud_instance/util/parse.py` | Provider response parsers. Converts cloud API responses into the common instance dict shape. functions: first_aws_ipv6_address, parse_aws_query, parse_gcp_query, parse_azure_query |
-| `cloud_instance/util/provision.py` | Provider provisioning logic. Creates instances and provider-specific resources. functions: update_new_deployment, update_errors, get_instance_type, provision, provision_aws_vm, provision_gcp_vm, provision_azure_vm |
-| `cloud_instance/util/terminate.py` | Provider termination logic. Deletes instances and cleans up reserved IP resources. functions: terminate, update_errors, terminate_aws_vm, terminate_gcp_vm, terminate_azure_vm |
+| `cloud_instance/util/fetch.py` | Provider-neutral fetch coordinator. functions: fetch, update_instances_list, update_errors |
+| `cloud_instance/util/parse.py` | Compatibility exports for provider parsers. no public classes/functions |
+| `cloud_instance/util/provision.py` | Provider-neutral provisioning coordinator. functions: update_new_deployment, update_errors, get_instance_type, provision, provision_aws_vm, provision_gcp_vm, provision_azure_vm |
+| `cloud_instance/util/terminate.py` | Provider-neutral termination coordinator. functions: terminate, update_errors |
