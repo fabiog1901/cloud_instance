@@ -33,7 +33,7 @@ AGENT_RULES = [
     "Keep reconciliation/provider-neutral planning in `cloud_instance/core/build.py`.",
     "Keep provider-specific create/fetch/parse/delete behavior in `cloud_instance/providers/`.",
     "Provider parsers should return `CloudInstance`; collections should be plain `list[CloudInstance]`.",
-    "Deployment models validate and normalize input before command/core/provider code consumes it.",
+    "Input models validate and normalize CLI JSON before command/core/provider code consumes it.",
 ]
 
 

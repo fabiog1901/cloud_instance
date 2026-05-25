@@ -4,7 +4,6 @@ from ..models import (
     BuildResult,
     CloudInstance,
     Cluster,
-    Deployment,
     Group,
     ProvisionTask,
 )
@@ -16,7 +15,7 @@ current_instances: list[CloudInstance] = []
 
 def build(
     deployment_id: str,
-    deployment: Deployment,
+    deployment: list[Cluster],
     fetched_instances: list[CloudInstance],
 ) -> BuildResult:
     global current_instances
@@ -24,7 +23,7 @@ def build(
 
     result = BuildResult()
 
-    for cluster in deployment.clusters:
+    for cluster in deployment:
         cluster_name = cluster.cluster_name or deployment_id
         copies = int(cluster.copies or 1)
         for x in range(copies):

@@ -363,18 +363,8 @@ class Cluster:
         return {**self.extra, **data}
 
 
-@dataclass(slots=True)
-class Deployment:
-    clusters: list[Cluster] = field(default_factory=list)
-
-    @classmethod
-    def from_list(cls, value: Any) -> "Deployment":
-        return cls(
-            clusters=[Cluster.from_dict(x) for x in _require_list(value, "deployment")]
-        )
-
-    def to_list(self) -> list[dict[str, Any]]:
-        return [x.to_dict() for x in self.clusters]
+def clusters_from_list(value: Any) -> list[Cluster]:
+    return [Cluster.from_dict(x) for x in _require_list(value, "deployment")]
 
 
 @dataclass(slots=True)

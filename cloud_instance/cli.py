@@ -13,7 +13,7 @@ from .commands.gather import gather
 from .commands.modify import modify
 from .commands.resize import resize
 from .commands.slated import slated
-from .models import CloudInstance, Deployment, GroupFilter, InstanceDefaults
+from .models import CloudInstance, GroupFilter, InstanceDefaults, clusters_from_list
 
 EPILOG = "Docs: <https://github.com/fabiog1901/cloud_instance>"
 
@@ -108,7 +108,7 @@ def cli_create(
     try:
         result = create(
             deployment_id,
-            Deployment.from_list(json.loads(deployment)),
+            clusters_from_list(json.loads(deployment)),
             InstanceDefaults.from_dict(json.loads(defaults)),
             preserve,
         )
@@ -169,7 +169,7 @@ def cli_slated(
     try:
         result = slated(
             deployment_id,
-            Deployment.from_list(json.loads(deployment)),
+            clusters_from_list(json.loads(deployment)),
         )
     except Exception as e:
         exit_with_error(e)

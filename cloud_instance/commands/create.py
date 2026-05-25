@@ -4,14 +4,14 @@ from ..core.build import build
 from ..core.fetch import fetch
 from ..core.provision import provision
 from ..core.terminate import terminate
-from ..models import CloudInstance, Deployment, InstanceDefaults
+from ..models import CloudInstance, Cluster, InstanceDefaults
 
 logger = logging.getLogger("cloud_instance")
 
 
 def create(
     deployment_id: str,
-    deployment: Deployment,
+    deployment: list[Cluster],
     defaults: InstanceDefaults,
     preserve: bool,
 ) -> list[CloudInstance]:

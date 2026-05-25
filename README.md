@@ -26,38 +26,72 @@ modify, scale, and delete the matching VMs.
 - Designed to grow: new environments can be added when suitable provider
   libraries or APIs are available. 🔧
 
-## Basic Shape
+## Create Deployment Payload
 
-A deployment is a JSON/YAML-like structure with clusters and groups. Each group
-declares where and how instances should be created:
+The `create --deployment` argument is a JSON array of clusters. There is no
+extra top-level deployment object; the CLI receives `list[Cluster]` directly.
+
+Each cluster can hold shared defaults such as `copies`, `inventory_groups`,
+`instance`, `volumes`, `tags`, and `security_groups`. Each item in `groups`
+describes one provider-specific group of instances. Cluster fields are merged
+into each group, and group fields win when both define the same setting.
+
+Common cluster fields:
+
+- `cluster_name`: base name for generated cluster copies; defaults to the
+  `deployment_id` when omitted.
+- `copies`: number of cluster copies to create.
+- `inventory_groups`: Ansible inventory groups shared by every child group.
+- `exact_count`: desired number of instances for a group unless overridden.
+- `instance`: generic shape such as `cpu`, `mem`, and `arch`.
+- `instance_type`: provider-native type; overrides `instance` lookup defaults.
+- `volumes`: `os` volume plus optional `data` volumes.
+- `tags`: tags/labels/metadata applied to provisioned instances.
+- `groups`: provider-specific instance groups.
+
+Common group fields:
+
+- `cloud`: provider name such as `aws`, `gcp`, `azure`, or `kloigos`.
+- `group_name`: stable group identity used when matching existing instances.
+- `region` and `zone`: provider location.
+- `exact_count`: desired number of instances in this group.
+- `user`: login/Ansible user.
+- `public_ip`: whether to request public network access.
+- `public_key_id`: provider key name or SSH public key, depending on provider.
+- `image`: provider image reference.
+- `subnet`, `vpc_id`, `security_groups`: network placement and firewall inputs.
+- `ip_address_type`: `ipv6`, `ipv4_ephemeral`, or `ipv4_reserved` where
+  supported.
+- `extra_vars`: arbitrary data returned with created instances.
+
+Example YAML shape:
 
 ```yaml
-deployment_id: workshop
-deployment:
-  - cluster_name: app
-    copies: 1
-    inventory_groups:
-      - web
-    exact_count: 2
-    instance:
-      cpu: 1
-    volumes:
-      os:
-        size: 20
-        type: standard_ssd
-      data: []
-    groups:
-      - cloud: aws
-        region: ca-central-1
-        zone: b
-        user: ubuntu
-        public_ip: true
-        ip_address_type: ipv6
-        image: /canonical/ubuntu/server/24.04
-        public_key_id: workshop
-        subnet: subnet-1234567890abcdef0
-        security_groups:
-          - sg-1234567890abcdef0
+- cluster_name: app
+  copies: 1
+  inventory_groups:
+    - web
+  exact_count: 2
+  instance:
+    cpu: 1
+  volumes:
+    os:
+      size: 20
+      type: standard_ssd
+    data: []
+  groups:
+    - cloud: aws
+      group_name: web
+      region: ca-central-1
+      zone: b
+      user: ubuntu
+      public_ip: true
+      ip_address_type: ipv6
+      image: /canonical/ubuntu/server/24.04
+      public_key_id: workshop
+      subnet: subnet-1234567890abcdef0
+      security_groups:
+        - sg-1234567890abcdef0
 ```
 
 Instance type defaults map a generic CPU/memory request to each provider's
@@ -186,9 +220,6 @@ deployment model in YAML and pass it to the CLI as JSON. 🚀
     - debug:
         var: instances.stdout | from_json
 ```
-
-See `play.yaml` for a larger local example that also shows resize and modify
-commands.
 
 ## Notes
 
