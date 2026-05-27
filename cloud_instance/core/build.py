@@ -108,13 +108,7 @@ def merge_cluster_group(parent: Cluster, child: Group) -> Group:
     child_data = child.to_dict()
     merged = {}
 
-    for k, v in parent_data.get("import", {}).items():
-        merged[k] = v
-
     for k, v in parent_data.items():
-        merged[k] = v
-
-    for k, v in child_data.get("import", {}).items():
         merged[k] = v
 
     for k, v in child_data.items():
